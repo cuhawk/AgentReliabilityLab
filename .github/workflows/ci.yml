@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The whole suite is CPU-only by design: mock tools, reference agents, no
+# model calls, no GPU. The eval gate below is deterministic and finishes in
+# seconds without API keys.
+jobs:
+  quality:
+    name: lint · types · tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check src tests examples
+      - run: uv run mypy
+      - run: uv run python -m pytest tests -q
+
+  eval-gate:
+    name: eval gate (suites/ci.yaml)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      # Fails the build when the guarded reference agent drops below the
+      # suite's expectations (task success, authz, secrets, injection...).
+      - run: uv run arl eval suites/ci.yaml
+
+  demo:
+    name: offline demo smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run arl demo
+
+  docker:
+    name: docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t arl .
+      - run: docker run --rm arl --version
+      - run: docker run --rm arl eval suites/ci.yaml

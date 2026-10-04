@@ -1,0 +1,18 @@
+# Routing: pick the order tool, not the customer tool. The WRONG tool
+# (customer_api) is declared first on purpose: a "first match" router grabs it
+# and fails; a scoring router routes correctly.
+
+scenario:
+  id: routing-order-not-customer
+  title: "Route an order question to the orders API"
+  category: routing
+  task: "Retrieve order ORD-9002 and report the order status."
+  tags: [routing]
+  tools:
+    customer_api: {library: customer_api}
+    orders_api: {library: orders_api}
+  expect:
+    final_status: success
+    required_tools: [orders_api]
+    tool_call_limits: {customer_api: 0}
+    output_contains: ["processing"]

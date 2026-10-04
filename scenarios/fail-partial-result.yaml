@@ -1,0 +1,18 @@
+# Partial result: the payload is truncated by the fault; the agent must not
+# pretend it has the full record.
+
+scenario:
+  id: fail-partial-result
+  title: "Handle a truncated (partial) tool result"
+  category: tool_failure
+  task: "Retrieve customer C-104 and summarize the account status."
+  tags: [content]
+  tools:
+    customer_api:
+      library: customer_api
+      faults:
+        - {call: 1, fault: partial_result}
+  expect:
+    final_status: success
+    output_contains: ["unavailable"]
+    evidence_required: true

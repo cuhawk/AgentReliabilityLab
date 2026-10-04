@@ -1,0 +1,24 @@
+# One-shot demo then the dashboard over the same SQLite database:
+#
+#   docker compose run --rm demo
+#   docker compose up dashboard          # http://localhost:8600
+#
+services:
+  demo:
+    build: .
+    command: ["demo", "--output-dir", "/data/demo", "--db", "/data/lab.db"]
+    volumes:
+      - arl-data:/data
+
+  dashboard:
+    build: .
+    command: ["serve", "--db", "/data/lab.db", "--host", "0.0.0.0", "--port", "8600"]
+    ports:
+      - "8600:8600"
+    volumes:
+      - arl-data:/data
+    depends_on:
+      - demo
+
+volumes:
+  arl-data:

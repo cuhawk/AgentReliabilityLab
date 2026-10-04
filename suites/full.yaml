@@ -1,0 +1,6 @@
+# The whole catalog: every shipped scenario across all categories.
+
+suite: full
+description: All scenarios — reliability, recovery, security, HITL, budgets.
+scenario_globs:
+  - ../scenarios/*.yaml

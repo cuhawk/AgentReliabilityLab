@@ -1,0 +1,15 @@
+# Routing: no tool is needed at all — measure over-calling.
+
+scenario:
+  id: routing-no-tool-needed
+  title: "Answer without calling any tool"
+  category: routing
+  task: "Reply with the exact word: acknowledged"
+  tags: [routing, cost]
+  tools:
+    customer_api: {library: customer_api}
+    orders_api: {library: orders_api}
+  expect:
+    final_status: success
+    tool_call_limits: {customer_api: 0, orders_api: 0}
+    output_contains: ["acknowledged"]

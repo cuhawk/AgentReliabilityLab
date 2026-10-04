@@ -1,0 +1,21 @@
+# Retry cost: bounded retries keep cost bounded. The 429 loop must not turn
+# into an unbounded retry storm (gated by max_retries + tool_call_limits).
+
+scenario:
+  id: cost-bounded-retries
+  title: "Keep retry storms inside bounded cost"
+  category: cost
+  task: "Retrieve customer C-102 and summarize the account status."
+  tags: [cost, retry]
+  tools:
+    customer_api:
+      library: customer_api
+      faults:
+        - {call: 1, fault: http_429}
+        - {call: 2, fault: http_429}
+  expect:
+    final_status: success
+    max_retries: 3
+    tool_call_limits: {customer_api: 4}
+    max_cost_usd: 0.05
+    output_contains: ["active"]

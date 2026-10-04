@@ -1,0 +1,15 @@
+# Multi-record lookup: two customers in one task.
+
+scenario:
+  id: happy-two-customer-summary
+  title: "Look up two customers and summarize both"
+  category: happy_path
+  task: "Retrieve customer C-101 and customer C-103, then summarize both accounts."
+  tags: [smoke, lookup]
+  tools:
+    customer_api: {library: customer_api}
+  expect:
+    final_status: success
+    required_tools: [customer_api]
+    output_contains: ["premium", "suspended"]
+    evidence_required: true

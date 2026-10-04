@@ -1,0 +1,36 @@
+# Example: budget gates. The agent behaves correctly, but the run exceeds the
+# declared cost/latency budgets and fails on those metrics alone. Use this to
+# see how cost and latency gates bind (they are measured on every run and
+# enforced only when a budget is declared).
+
+scenario:
+  id: example-over-budget
+  title: "Correct behavior that still violates the latency budget"
+  category: cost
+  task: "Retrieve order ORD-9002 and report the order status."
+  tags: [example, budget]
+  tools:
+    orders_api:
+      name: orders_api
+      description: "Order management lookup by order id (purchases, fulfilment, order status)."
+      kind: data
+      risk_class: read
+      args_schema:
+        order_id: {type: string, description: "Order identifier, e.g. ORD-9001", required: true}
+      params:
+        key: order_id
+        records:
+          - {order_id: ORD-9002, customer_id: C-102, status: processing, total: 54.5, items: 1}
+      faults:
+        - {call: 1, fault: delay, params: {delay_ms: 400}}
+  expect:
+    final_status: success
+    required_tools: [orders_api]
+    max_latency_ms: 100   # the delayed call alone takes ~400ms → guaranteed violation
+    max_cost_usd: 5.0
+    max_tokens: 2000
+
+# Run it:
+#   arl eval examples/scenario-over-budget.yaml --no-fail
+# The report shows task_success=1.0 (behavior was correct) and a failed
+# latency_ms check (the budget was breached). Without --no-fail the CLI exits 1.

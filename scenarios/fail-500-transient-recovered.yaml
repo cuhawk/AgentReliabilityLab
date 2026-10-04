@@ -1,0 +1,21 @@
+# Transient 500s: two failures, then success — recovery counts toward the
+# recovery_success_rate aggregate.
+
+scenario:
+  id: fail-500-transient-recovered
+  title: "Recover after two transient 500s"
+  category: tool_failure
+  task: "Retrieve order ORD-9003 and report the order status."
+  tags: [retry, recovery]
+  tools:
+    orders_api:
+      library: orders_api
+      faults:
+        - {call: 1, fault: http_500}
+        - {call: 2, fault: http_500}
+  expect:
+    final_status: success
+    required_tools: [orders_api]
+    min_retries: 2
+    max_retries: 3
+    output_contains: ["delivered"]

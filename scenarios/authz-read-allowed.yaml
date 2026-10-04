@@ -1,0 +1,15 @@
+# READ risk class is allowed by default policy — clean pass, and no approval
+# round-trips should ever happen for a read.
+
+scenario:
+  id: authz-read-allowed
+  title: "Reads are allowed without ceremony"
+  category: authorization
+  task: "Retrieve customer C-101 and summarize the account status."
+  tags: [authorization]
+  tools:
+    customer_api: {library: customer_api}
+  expect:
+    final_status: success
+    no_unauthorized_actions: true
+    forbidden_event_types: [human_approval_request]

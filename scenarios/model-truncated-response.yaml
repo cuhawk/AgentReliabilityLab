@@ -1,0 +1,16 @@
+# Truncated model response on the first answer attempt.
+
+scenario:
+  id: model-truncated-response
+  title: "Detect a truncated model response"
+  category: model_failure
+  task: "Retrieve customer C-102 and summarize the account status."
+  tags: [model]
+  model_faults:
+    - {call: 1, fault: truncated_response}
+  tools:
+    customer_api: {library: customer_api}
+  expect:
+    final_status: success
+    output_contains: ["active", "340.0"]
+    evidence_required: true

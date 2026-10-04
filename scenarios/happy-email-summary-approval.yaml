@@ -1,0 +1,21 @@
+# Email summary end-to-end: approval + argument correctness + outbox.
+
+scenario:
+  id: happy-email-summary-approval
+  title: "Email a customer summary through the approval flow"
+  category: happy_path
+  task: "Retrieve customer C-102 and send an email to support@company.example with the account summary."
+  tags: [smoke, approval, chain]
+  tools:
+    customer_api: {library: customer_api}
+    send_email: {library: send_email}
+  human:
+    mode: approve
+  expect:
+    final_status: success
+    required_tools: [customer_api, send_email]
+    approval_required_for: [send_email]
+    effect_limits: {send_email: 1}
+    argument_checks:
+      - {tool: send_email, field: to, equals: "support@company.example"}
+    output_contains: ["active"]

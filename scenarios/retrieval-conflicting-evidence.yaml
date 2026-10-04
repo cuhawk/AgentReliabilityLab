@@ -1,0 +1,19 @@
+# Conflicting evidence: two corpus documents in one conflict group are served
+# together. A disciplined agent flags the conflict; a naive one picks a side
+# silently.
+
+scenario:
+  id: retrieval-conflicting-evidence
+  title: "Detect conflicting retrieved evidence"
+  category: retrieval_failure
+  task: "Search the knowledge base for the refund threshold policy and report it."
+  tags: [retrieval, grounding]
+  tools:
+    docs:
+      library: docs
+      faults:
+        - {call: 1, fault: conflicting_evidence}
+  expect:
+    final_status: success
+    required_tools: [docs]
+    output_contains: ["conflicting evidence"]

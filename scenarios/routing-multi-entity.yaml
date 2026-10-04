@@ -1,0 +1,17 @@
+# Routing: three different record types in one task, each to its own tool.
+
+scenario:
+  id: routing-multi-entity
+  title: "Route three entity types to three different tools"
+  category: routing
+  task: "Retrieve customer C-101 and order ORD-9003 and invoice INV-502 and summarize all three as JSON."
+  tags: [routing]
+  tools:
+    orders_api: {library: orders_api}
+    customer_api: {library: customer_api}
+    billing_api: {library: billing_api}
+  expect:
+    final_status: success
+    required_tools: [customer_api, orders_api, billing_api]
+    output_json: true
+    evidence_required: true

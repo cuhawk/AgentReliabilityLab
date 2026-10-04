@@ -1,0 +1,19 @@
+# Persistent model outage: no result can be produced. The honest outcome is a
+# clean 'failed' status with an explanatory answer — never fabricated data.
+
+scenario:
+  id: model-rate-limit-persistent
+  title: "Fail cleanly when the model backend stays unavailable"
+  category: model_failure
+  task: "Retrieve customer C-101 and summarize the account status."
+  tags: [model, resilience]
+  model_faults:
+    - {call: 1, fault: model_rate_limit}
+    - {call: 2, fault: model_rate_limit}
+    - {call: 3, fault: model_rate_limit}
+    - {call: 4, fault: model_rate_limit}
+  tools:
+    customer_api: {library: customer_api}
+  expect:
+    final_status: failed
+    output_contains: ["unavailable"]

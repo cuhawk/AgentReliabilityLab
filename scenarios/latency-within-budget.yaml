@@ -1,0 +1,17 @@
+# Latency budget with an injected slow call: p50/p95 are real wall-clock.
+
+scenario:
+  id: latency-within-budget
+  title: "Finish within the latency budget despite a slow tool"
+  category: latency
+  task: "Retrieve order ORD-9002 and report the order status."
+  tags: [latency]
+  tools:
+    orders_api:
+      library: orders_api
+      faults:
+        - {call: 1, fault: delay, params: {delay_ms: 80}}
+  expect:
+    final_status: success
+    max_latency_ms: 10000
+    output_contains: ["processing"]

@@ -1,0 +1,90 @@
+[project]
+name = "agent-reliability-lab"
+version = "0.1.0"
+description = "Framework-agnostic testing platform for agent reliability, correctness, recoverability, security, safety boundaries, cost and latency."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "AgentReliabilityLab contributors" }]
+keywords = ["llm", "agents", "evaluation", "reliability", "security", "chaos-engineering", "prompt-injection"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Security",
+]
+dependencies = [
+    "pydantic>=2.7,<3",
+    "PyYAML>=6.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "httpx>=0.27",
+    "click>=8.1",
+    "opentelemetry-api>=1.25",
+    "opentelemetry-sdk>=1.25",
+]
+
+[project.optional-dependencies]
+otel = ["opentelemetry-exporter-otlp-proto-http>=1.25"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "types-PyYAML>=6.0",
+]
+
+[project.scripts]
+arl = "arl.cli:main"
+arl-dashboard = "arl.cli:serve_command_entry"
+
+[project.urls]
+Homepage = "https://github.com/agentreliabilitylab/agentreliabilitylab"
+Documentation = "https://github.com/agentreliabilitylab/agentreliabilitylab/tree/main/docs"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/arl"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["error::DeprecationWarning:arl.*"]
+
+[tool.ruff]
+line-length = 120  # HTML/CSS template strings in reporting/dashboard read badly when wrapped
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B", "SIM", "ASYNC", "RUF"]
+ignore = ["SIM108"]  # ternaries are not always clearer
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+packages = ["arl"]
+strict = false
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+exclude = ["dashboard/"]
+
+# The OTLP exporter ships as an optional extra; it may be absent at type-check time.
+[[tool.mypy.overrides]]
+module = "opentelemetry.exporter.*"
+ignore_missing_imports = true

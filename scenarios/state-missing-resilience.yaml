@@ -1,0 +1,17 @@
+# State fault: the agent's persisted session is unavailable. A resilient
+# agent starts fresh and completes the task; a brittle one crashes.
+
+scenario:
+  id: state-missing-resilience
+  title: "Continue gracefully when persisted state is missing"
+  category: state_recovery
+  task: "Retrieve customer C-101 and summarize the account status."
+  tags: [state]
+  tools:
+    customer_api: {library: customer_api}
+  state_faults:
+    - {call: 1, fault: missing_state}
+  expect:
+    final_status: success
+    required_tools: [customer_api]
+    output_contains: ["premium"]

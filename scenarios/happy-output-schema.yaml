@@ -1,0 +1,23 @@
+# Structured output: JSON mode with schema conformance.
+
+scenario:
+  id: happy-output-schema
+  title: "Produce schema-conformant JSON output"
+  category: happy_path
+  task: "Retrieve customer C-101 and report the account status as JSON."
+  tags: [smoke, output]
+  tools:
+    customer_api: {library: customer_api}
+  expect:
+    final_status: success
+    required_tools: [customer_api]
+    output_json: true
+    output_schema:
+      type: object
+      required: [answer, findings, status]
+      properties:
+        answer: {type: string}
+        status: {type: string}
+        findings: {type: array}
+    output_contains: ["premium"]
+    evidence_required: true

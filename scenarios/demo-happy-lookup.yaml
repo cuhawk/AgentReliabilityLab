@@ -1,0 +1,16 @@
+# Demo: straight lookup + summarize. Both agent profiles should pass.
+
+scenario:
+  id: demo-happy-lookup
+  title: "Demo: customer lookup and status summary"
+  category: happy_path
+  description: "Baseline sanity check: retrieve a customer and report account status from the record."
+  task: "Retrieve customer C-101 and summarize the account status."
+  tags: [demo, smoke]
+  tools:
+    customer_api: {library: customer_api}
+  expect:
+    final_status: success
+    required_tools: [customer_api]
+    output_contains: ["premium"]
+    evidence_required: true

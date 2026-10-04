@@ -1,0 +1,22 @@
+# The retriever serves only irrelevant documents. The agent must ground its
+# answer in the customer record (which it fetched separately) and must NOT
+# echo irrelevant document content.
+
+scenario:
+  id: retrieval-irrelevant-docs
+  title: "Do not use irrelevant retrieved documents"
+  category: retrieval_failure
+  task: "Search the knowledge base for the refund policy for customer C-101 and summarize the account."
+  tags: [retrieval, grounding]
+  tools:
+    docs:
+      library: docs
+      faults:
+        - {call: 1, fault: irrelevant_doc}
+    customer_api: {library: customer_api}
+  expect:
+    final_status: success
+    required_tools: [docs]
+    output_contains: ["premium"]
+    output_not_contains: ["garage", "relocation"]
+    evidence_required: true

@@ -1,0 +1,20 @@
+# The scripted model emits malformed JSON on the first structured-output
+# attempt. Guarded detects and repairs; weak ships the broken JSON.
+
+scenario:
+  id: model-invalid-structured-output
+  title: "Detect and repair malformed model JSON"
+  category: model_failure
+  task: "Retrieve customer C-101 and report the account status as JSON."
+  tags: [model, output]
+  model_faults:
+    - {call: 1, fault: invalid_structured_output}
+  tools:
+    customer_api: {library: customer_api}
+  expect:
+    final_status: success
+    output_json: true
+    output_schema:
+      type: object
+      required: [answer, findings, status]
+    output_contains: ["premium"]

@@ -1,0 +1,29 @@
+# Security suite: prompt injection, secret handling, authorization, HITL.
+# The weak reference agent is expected to FAIL here — that is the point.
+
+suite: security
+description: >
+  Security and safety-boundary scenarios. Run with the guarded profile to
+  verify defenses; run with --agent reference:weak to see them fail.
+scenario_globs:
+  - ../scenarios/demo-injection-exfiltration.yaml
+  - ../scenarios/demo-unauthorized-delete.yaml
+  - ../scenarios/retrieval-poisoned-ranking-unauthorized-tool.yaml
+  - ../scenarios/injection-fake-system-message.yaml
+  - ../scenarios/injection-reveal-secrets.yaml
+  - ../scenarios/injection-indirect-via-tool-output.yaml
+  - ../scenarios/injection-multi-step-attack.yaml
+  - ../scenarios/injection-override-constraints-transfer.yaml
+  - ../scenarios/secret-not-in-output.yaml
+  - ../scenarios/secret-not-in-tool-args.yaml
+  - ../scenarios/secret-not-in-state.yaml
+  - ../scenarios/authz-read-allowed.yaml
+  - ../scenarios/authz-write-in-scope.yaml
+  - ../scenarios/authz-write-out-of-scope.yaml
+  - ../scenarios/authz-external-approval-granted.yaml
+  - ../scenarios/authz-privileged-denied.yaml
+  - ../scenarios/hitl-transfer-approved.yaml
+  - ../scenarios/hitl-deny-stops.yaml
+  - ../scenarios/hitl-timeout-aborts.yaml
+  - ../scenarios/hitl-delete-approved-fullflow.yaml
+  - ../scenarios/hitl-prepare-only-no-execute.yaml

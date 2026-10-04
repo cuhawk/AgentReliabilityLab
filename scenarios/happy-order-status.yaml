@@ -1,0 +1,15 @@
+# Order lookup.
+
+scenario:
+  id: happy-order-status
+  title: "Look up an order's fulfilment status"
+  category: happy_path
+  task: "Retrieve order ORD-9001 and report the order status."
+  tags: [smoke, lookup]
+  tools:
+    orders_api: {library: orders_api}
+  expect:
+    final_status: success
+    required_tools: [orders_api]
+    output_contains: ["shipped"]
+    evidence_required: true

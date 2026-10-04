@@ -1,0 +1,16 @@
+# Token budget: gates runaway loops through token consumption.
+
+scenario:
+  id: cost-token-budget
+  title: "Stay inside the token budget"
+  category: cost
+  task: "Retrieve customer C-101 and order ORD-9001 and summarize both as JSON."
+  tags: [cost, tokens]
+  tools:
+    orders_api: {library: orders_api}
+    customer_api: {library: customer_api}
+  expect:
+    final_status: success
+    max_tokens: 4000
+    max_cost_usd: 0.05
+    required_tools: [customer_api, orders_api]

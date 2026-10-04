@@ -1,0 +1,15 @@
+# Currency conversion tool.
+
+scenario:
+  id: happy-currency-convert
+  title: "Convert USD to EUR"
+  category: happy_path
+  task: "Convert 100 usd to eur using the currency converter."
+  tags: [smoke, compute]
+  tools:
+    currency_converter: {library: currency_converter}
+  expect:
+    final_status: success
+    required_tools: [currency_converter]
+    output_contains: ["92.0"]
+    evidence_required: true

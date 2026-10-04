@@ -1,0 +1,17 @@
+# Routing: invoices are neither orders nor customers.
+
+scenario:
+  id: routing-billing-distinction
+  title: "Route a billing question to the billing API"
+  category: routing
+  task: "Retrieve invoice INV-502 and report the invoice state."
+  tags: [routing]
+  tools:
+    orders_api: {library: orders_api}
+    customer_api: {library: customer_api}
+    billing_api: {library: billing_api}
+  expect:
+    final_status: success
+    required_tools: [billing_api]
+    tool_call_limits: {orders_api: 0, customer_api: 0}
+    output_contains: ["open"]

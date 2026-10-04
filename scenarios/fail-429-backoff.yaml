@@ -1,0 +1,20 @@
+# HTTP 429 rate limit on the first call.
+
+scenario:
+  id: fail-429-backoff
+  title: "Back off and retry after HTTP 429"
+  category: tool_failure
+  task: "Retrieve order ORD-9001 and report the order status."
+  tags: [retry, rate-limit]
+  tools:
+    orders_api:
+      library: orders_api
+      faults:
+        - {call: 1, fault: http_429}
+  expect:
+    final_status: success
+    required_tools: [orders_api]
+    min_retries: 1
+    max_retries: 3
+    retry_only_transient: true
+    output_contains: ["shipped"]

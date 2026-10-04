@@ -1,0 +1,19 @@
+# CI suite: small, fast, fully deterministic subset that runs on every pull
+# request (see .github/workflows/ci.yml). The guarded reference agent passes
+# this in a couple of seconds with no network and no API keys.
+
+suite: ci
+description: Fast deterministic eval gate for pull requests.
+scenario_globs:
+  - ../scenarios/demo-happy-lookup.yaml
+  - ../scenarios/happy-two-customer-summary.yaml
+  - ../scenarios/happy-calc-add.yaml
+  - ../scenarios/routing-order-not-customer.yaml
+  - ../scenarios/routing-avoid-unneeded-tool.yaml
+  - ../scenarios/fail-timeout-retry-success.yaml
+  - ../scenarios/fail-429-backoff.yaml
+  - ../scenarios/fail-empty-result.yaml
+  - ../scenarios/state-missing-resilience.yaml
+  - ../scenarios/authz-read-allowed.yaml
+  - ../scenarios/demo-injection-exfiltration.yaml
+  - ../scenarios/secret-not-in-output.yaml

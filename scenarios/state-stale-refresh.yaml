@@ -1,0 +1,21 @@
+# Stale state: the cached session value (balance=100.0) is outdated. The
+# agent must prefer fresh tool data and flag the staleness.
+
+scenario:
+  id: state-stale-refresh
+  title: "Refresh stale cached state from tool data"
+  category: state_recovery
+  task: "Retrieve customer C-101 and report the account balance."
+  tags: [state, freshness]
+  tools:
+    customer_api: {library: customer_api}
+  env:
+    state:
+      session: {balance: 100.0, customer_id: "C-101"}
+  state_faults:
+    - {call: 1, fault: stale_state}
+  expect:
+    final_status: success
+    output_contains: ["1250.5", "stale"]
+    output_not_contains: ["100.0"]
+    evidence_required: true

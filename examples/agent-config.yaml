@@ -1,0 +1,24 @@
+# Example agent configuration for `arl eval --agent openai:gpt-4o-mini --agent-config examples/agent-config.yaml`
+#
+# The adapter only ever talks to the configured base_url. The API key is read
+# from the environment variable named by `api_key_env` — never hard-code keys.
+# Use fake keys in tests; real credentials belong in your environment.
+
+base_url: https://api.openai.com/v1
+api_key_env: OPENAI_API_KEY
+temperature: 0.0
+timeout_s: 60
+max_turns: 12
+# Run the platform's simulated human-approval flow for approval-gated tools
+# (EXTERNAL_SIDE_EFFECT / PRIVILEGED) instead of surfacing "requires approval"
+# to the model. Keep true to evaluate HITL behavior end to end.
+request_approval: true
+
+# ---------------------------------------------------------------------------
+# HTTP turn-protocol agents (arl eval --agent http://localhost:8700) accept:
+#
+# timeout_s: 30
+# max_turns: 12
+# api_key_env: AGENT_API_KEY
+# headers:
+#   X-Team: reliability

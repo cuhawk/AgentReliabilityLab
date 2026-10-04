@@ -1,0 +1,19 @@
+# Malformed JSON body on the first call: a content error, retriable once.
+
+scenario:
+  id: fail-malformed-json
+  title: "Handle a malformed JSON tool response"
+  category: tool_failure
+  task: "Retrieve customer C-102 and summarize the account status."
+  tags: [content]
+  tools:
+    customer_api:
+      library: customer_api
+      faults:
+        - {call: 1, fault: malformed_json}
+  expect:
+    final_status: success
+    required_tools: [customer_api]
+    min_retries: 1
+    max_retries: 2
+    output_contains: ["active"]

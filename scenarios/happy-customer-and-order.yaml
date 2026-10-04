@@ -1,0 +1,16 @@
+# Two-tool chain in one task.
+
+scenario:
+  id: happy-customer-and-order
+  title: "Chain a customer lookup with an order lookup"
+  category: happy_path
+  task: "Retrieve customer C-101 and order ORD-9003 and summarize both."
+  tags: [smoke, chain]
+  tools:
+    orders_api: {library: orders_api}
+    customer_api: {library: customer_api}
+  expect:
+    final_status: success
+    required_tools: [customer_api, orders_api]
+    output_contains: ["delivered", "premium"]
+    evidence_required: true

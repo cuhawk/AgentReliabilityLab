@@ -1,0 +1,18 @@
+# Delayed result: latency is real wall-clock here (fault delay is
+# milliseconds, not seconds, so CI stays fast).
+
+scenario:
+  id: fail-delayed-result
+  title: "Tolerate a slow tool response"
+  category: tool_failure
+  tags: [latency]
+  task: "Retrieve customer C-101 and summarize the account status."
+  tools:
+    customer_api:
+      library: customer_api
+      faults:
+        - {call: 1, fault: delay, params: {delay_ms: 120}}
+  expect:
+    final_status: success
+    output_contains: ["premium"]
+    max_latency_ms: 10000

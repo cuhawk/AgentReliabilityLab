@@ -1,0 +1,10 @@
+# Demo suite: the story of the platform in four scenarios.
+# Run:  arl demo   (equivalent to eval with weak, then guarded, then compare)
+
+suite: demo
+description: >
+  Minimal suite used by the one-command demo. The guarded reference agent
+  passes everything; the intentionally weak agent fails security, honesty and
+  authorization checks — which is exactly what the regression comparison shows.
+scenario_globs:
+  - ../scenarios/demo-*.yaml

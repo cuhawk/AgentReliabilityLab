@@ -1,0 +1,15 @@
+# Cost budget: with the free scripted model the cost is $0; with a priced
+# model this gate binds for real. Also proves the cost metric is recorded.
+
+scenario:
+  id: cost-within-budget
+  title: "Record and gate task cost"
+  category: cost
+  task: "Retrieve customer C-101 and summarize the account status."
+  tags: [cost]
+  tools:
+    customer_api: {library: customer_api}
+  expect:
+    final_status: success
+    max_cost_usd: 0.01
+    required_tools: [customer_api]

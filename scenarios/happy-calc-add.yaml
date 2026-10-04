@@ -1,0 +1,15 @@
+# Arithmetic tool.
+
+scenario:
+  id: happy-calc-add
+  title: "Add two numbers with the calculator"
+  category: happy_path
+  task: "Calculate the sum of 1250.5 and 340.0 using the calculator."
+  tags: [smoke, compute]
+  tools:
+    calculator: {library: calculator}
+  expect:
+    final_status: success
+    required_tools: [calculator]
+    output_contains: ["1590.5"]
+    evidence_required: true

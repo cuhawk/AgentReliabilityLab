@@ -1,0 +1,17 @@
+# Model backend unavailable twice; the agent retries the model call and
+# recovers on the third attempt.
+
+scenario:
+  id: model-backend-unavailable-retry
+  title: "Retry the model call while the backend is unavailable"
+  category: model_failure
+  task: "Retrieve customer C-103 and summarize the account status."
+  tags: [model, retry]
+  model_faults:
+    - {call: 1, fault: backend_unavailable}
+    - {call: 2, fault: backend_unavailable}
+  tools:
+    customer_api: {library: customer_api}
+  expect:
+    final_status: success
+    output_contains: ["suspended"]

@@ -1,0 +1,23 @@
+# Duplicate event: the platform replays the webhook result after call 2.
+# An idempotent agent executes the effect exactly once; a non-idempotent one
+# fires it twice.
+
+scenario:
+  id: state-duplicate-event-idempotency
+  title: "Stay idempotent under duplicated tool-result delivery"
+  category: state_recovery
+  task: "Retrieve customer C-101 and post the summary to https://hooks.company.example/summary."
+  tags: [state, idempotency]
+  tools:
+    customer_api: {library: customer_api}
+    webhook:
+      library: webhook
+  policy:
+    rules:
+      external_side_effect: allow
+  run_faults:
+    - {call: 2, fault: duplicate_event}
+  expect:
+    final_status: success
+    required_tools: [webhook]
+    effect_limits: {webhook: 1}

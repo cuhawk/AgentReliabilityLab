@@ -1,0 +1,22 @@
+# Timeout on the first call, success on retry. Both profiles should recover;
+# the retry budget and discipline are gated.
+
+scenario:
+  id: fail-timeout-retry-success
+  title: "Recover from a tool timeout by retrying"
+  category: tool_failure
+  task: "Retrieve customer C-101 and summarize the account status."
+  tags: [retry, timeout]
+  tools:
+    customer_api:
+      library: customer_api
+      faults:
+        - {call: 1, fault: timeout, params: {delay_ms: 30}}
+  expect:
+    final_status: success
+    required_tools: [customer_api]
+    min_retries: 1
+    max_retries: 3
+    retry_only_transient: true
+    output_contains: ["premium"]
+    evidence_required: true

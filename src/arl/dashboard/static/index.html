@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentReliabilityLab</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --border: #262b36; --text: #e6e9ef;
+    --muted: #8b93a3; --accent: #5b9dff; --ok: #3fb96f; --bad: #e5484d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.5 "Segoe UI", system-ui, sans-serif; }
+  header { padding: 14px 22px; border-bottom: 1px solid var(--border);
+           display: flex; gap: 14px; align-items: baseline; }
+  header h1 { font-size: 17px; margin: 0; }
+  header span { color: var(--muted); font-size: 12px; }
+  main { display: grid; grid-template-columns: 300px 1fr; min-height: calc(100vh - 51px); }
+  aside { border-right: 1px solid var(--border); overflow-y: auto; max-height: calc(100vh - 51px); }
+  section { padding: 18px 26px; overflow-y: auto; max-height: calc(100vh - 51px); }
+  .run { padding: 10px 16px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .run:hover, .run.active { background: var(--panel); }
+  .run .meta { color: var(--muted); font-size: 12px; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px;
+          background: var(--panel); border: 1px solid var(--border); margin-left: 6px; }
+  .pill.ok { color: var(--ok); border-color: var(--ok); }
+  .pill.bad { color: var(--bad); border-color: var(--bad); }
+  h2 { font-size: 15px; margin: 4px 0 12px; }
+  h3 { font-size: 13px; color: var(--muted); text-transform: uppercase;
+       letter-spacing: .06em; margin: 22px 0 8px; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .metric { background: var(--panel); border: 1px solid var(--border);
+            border-radius: 8px; padding: 10px 12px; }
+  .metric .v { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .metric .n { color: var(--muted); font-size: 12px; }
+  .metric .ci { color: var(--muted); font-size: 11px; }
+  tr.sc { cursor: pointer; }
+  tr.sc:hover { background: var(--panel); }
+  pre { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+        padding: 12px; overflow-x: auto; font-size: 12px; line-height: 1.45; }
+  .fail { color: var(--bad); } .pass { color: var(--ok); }
+  .muted { color: var(--muted); }
+  button { background: var(--panel); color: var(--text); border: 1px solid var(--border);
+           border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AgentReliabilityLab</h1>
+  <span id="dbinfo">read-only dashboard · eval engine owns the database</span>
+</header>
+<main>
+  <aside id="runs"><div class="run muted">loading…</div></aside>
+  <section id="detail">
+    <div class="muted">Select a run on the left. Use <code>arl eval suites/ci.yaml --db .arl/lab.db</code>
+    to populate the database, then <code>arl serve</code>.</div>
+  </section>
+</main>
+<script>
+const detail = document.getElementById('detail');
+const runsEl = document.getElementById('runs');
+const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const cls = s => s === 'pass' ? 'pass' : (s === 'fail' ? 'fail' : 'muted');
+
+async function loadRuns() {
+  const runs = await (await fetch('/api/runs')).json();
+  runsEl.innerHTML = runs.length ? runs.map(r => `
+    <div class="run" data-id="${esc(r.run_id)}">
+      <div>${esc(r.suite || '(no suite)')}
+        <span class="pill ${Number(r.metrics?.suite_pass_rate?.value) >= 1 ? 'ok' : 'bad'}">
+          ${r.metrics?.suite_pass_rate ? (100 * r.metrics.suite_pass_rate.value).toFixed(0) + '%' : '—'}
+        </span>
+      </div>
+      <div class="meta">${esc(r.agent_id || '')} · ${new Date(r.created_at * 1000).toLocaleString()}</div>
+    </div>`).join('') : '<div class="run muted">no runs stored yet</div>';
+  for (const el of runsEl.querySelectorAll('.run[data-id]'))
+    el.onclick = () => showRun(el.dataset.id, el);
+  if (runs.length) runsEl.querySelector('.run').click();
+}
+
+function metricCards(metrics) {
+  return '<div class="metrics">' + Object.entries(metrics || {}).map(([name, m]) => `
+    <div class="metric"><div class="n">${esc(name)}</div>
+      <div class="v">${Number(m.value).toFixed(4)}</div>
+      <div class="ci">${m.ci_low != null ? `CI95 [${Number(m.ci_low).toFixed(3)}, ${Number(m.ci_high).toFixed(3)}] · n=${m.n ?? '—'}` : ''}</div>
+    </div>`).join('') + '</div>';
+}
+
+async function showRun(runId, el) {
+  for (const n of runsEl.querySelectorAll('.run')) n.classList.remove('active');
+  if (el) el.classList.add('active');
+  const run = await (await fetch('/api/runs/' + encodeURIComponent(runId))).json();
+  detail.innerHTML = `
+    <h2>${esc(run.suite || 'run')} <span class="muted">· ${esc(run.agent_id)} · ${esc(run.model || '')}</span></h2>
+    ${metricCards(run.metrics)}
+    <h3>Scenarios (${run.results.filter(r => r.status === 'pass').length}/${run.results.length} passed)</h3>
+    <table><tr><th>scenario</th><th>category</th><th>status</th><th>final</th><th class="num">ms</th></tr>
+    ${run.results.map(r => `
+      <tr class="sc" data-sid="${esc(r.scenario_id)}">
+        <td>${esc(r.scenario_id)}</td><td class="muted">${esc(r.category)}</td>
+        <td class="${cls(r.status)}">${esc(r.status)}</td>
+        <td class="muted">${esc(r.final_status)}</td>
+        <td class="num">${Number(r.duration_ms).toFixed(1)}</td>
+      </tr>`).join('')}
+    </table>`;
+  for (const row of detail.querySelectorAll('tr.sc'))
+    row.onclick = () => showScenario(runId, row.dataset.sid);
+}
+
+async function showScenario(runId, sid) {
+  const s = await (await fetch(`/api/runs/${encodeURIComponent(runId)}/scenarios/${encodeURIComponent(sid)}`)).json();
+  const failed = (s.checks || []).filter(c => c.status === 'fail');
+  detail.innerHTML = `
+    <button onclick="showRun('${esc(runId)}')">← back to run</button>
+    <h2>${esc(sid)} <span class="pill ${cls(s.status)}">${esc(s.status)}</span>
+        <span class="muted">final_status=${esc(s.final_status)} · ${Number(s.duration_ms).toFixed(1)} ms</span></h2>
+    ${failed.length ? `<h3>Failed checks</h3><pre>${failed.map(c =>
+        `[${esc(c.metric)}] ${esc(c.message || c.expected || '')}`).join('\n')}</pre>` : ''}
+    ${metricCards(s.metrics)}
+    ${s.violations && s.violations.length ? `<h3>Violations</h3><pre>${esc(s.violations.map(v =>
+        `${v.kind}: ${v.tool || ''}: ${v.detail}`).join('\n'))}</pre>` : ''}
+    <h3>Tool calls</h3>
+    <table><tr><th>tool</th><th>attempt</th><th>status</th><th>fault</th><th class="num">ms</th></tr>
+    ${(s.tool_calls || []).map(c => `
+      <tr><td>${esc(c.name)}</td><td>${c.attempt}</td>
+          <td class="${c.status === 'ok' ? 'pass' : 'fail'}">${esc(c.status)}</td>
+          <td>${esc(c.fault || c.error_kind || '')}</td>
+          <td class="num">${Number(c.latency_ms).toFixed(1)}</td></tr>`).join('')}
+    </table>
+    <h3>Trace</h3>
+    <pre>${esc(s.trace_text)}</pre>`;
+}
+
+loadRuns();
+</script>
+</body>
+</html>

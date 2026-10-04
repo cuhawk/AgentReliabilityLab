@@ -1,0 +1,17 @@
+# Routing: do not call tools that are not needed. orders_api declared first;
+# a first-match router would query orders for a customer question.
+
+scenario:
+  id: routing-avoid-unneeded-tool
+  title: "Do not call unnecessary tools"
+  category: routing
+  task: "Retrieve customer C-102 and summarize the account."
+  tags: [routing, cost]
+  tools:
+    orders_api: {library: orders_api}
+    customer_api: {library: customer_api}
+  expect:
+    final_status: success
+    required_tools: [customer_api]
+    tool_call_limits: {orders_api: 0}
+    output_contains: ["active"]
