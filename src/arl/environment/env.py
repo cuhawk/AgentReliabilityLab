@@ -220,7 +220,7 @@ class ToolEnvironment:
             raise PolicyDeniedError(decision.reason)
 
         await self._recorder.emit(
-            EventType.POLICY_CHECK, name=name, decision="allowed",
+            EventType.POLICY_CHECK, name=name, tool_call_id=tool_call_id, decision="allowed",
             risk_class=spec.risk_class, action=decision.action.value, reason=decision.reason,
         )
 

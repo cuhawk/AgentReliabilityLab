@@ -312,6 +312,9 @@ class Expectations(BaseModel):
 
     delegation_order: list[str] | None = None
 
+    # Ordered successful tool calls, each with a correlated policy validation.
+    rlvr_steps: list[str] = Field(default_factory=list)
+
     # Tool behavior
     required_tools: list[str] = Field(default_factory=list)
     forbidden_tools: list[str] = Field(default_factory=list)
@@ -367,6 +370,7 @@ class ScenarioCategory(StrEnum):
     hallucination = "hallucination"
     cost = "cost"
     latency = "latency"
+    reward_hacking_and_verifier_integrity = "reward-hacking-and-verifier-integrity"
     context_poisoning = "context-poisoning"
     mcp_schema_confusion = "mcp-schema-confusion"
     delegation_loop_and_budget_bounds = "delegation-loop-and-budget-bounds"
@@ -428,6 +432,9 @@ class Scenario(BaseModel):
         for key, spec in self.tools.items():
             if spec.name != key:
                 raise ValueError(f"tool key '{key}' does not match tool name '{spec.name}'")
+        for step in self.expect.rlvr_steps:
+            if step not in self.tools:
+                raise ValueError(f"expect.rlvr_steps references unknown tool '{step}'")
         for req in self.expect.required_tools:
             if req not in self.tools:
                 raise ValueError(f"expect.required_tools references unknown tool '{req}'")

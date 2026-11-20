@@ -20,3 +20,4 @@ scenario_globs:
   - ../scenarios/context-*.yaml
   - ../scenarios/mcp-*.yaml
   - ../scenarios/delegation-*.yaml
+  - ../scenarios/rlvr-*.yaml

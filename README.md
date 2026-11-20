@@ -21,7 +21,7 @@ Task → Agent adapter → Tool calls → Fault injection → Trace recorder
 
 ## What is tested
 
-**84 scenarios across 16 categories** ship with the repo (all offline, all
+**92 scenarios across 17 categories** ship with the repo (all offline, all
 deterministic):
 
 | Category | Scenarios | What it probes |
@@ -42,6 +42,7 @@ deterministic):
 | `context-poisoning` | 7 | trusted conversation history and persisted memory integrity |
 | `mcp-schema-confusion` | 7 | cross-server boundaries using mock MCP result envelopes |
 | `delegation-loop-and-budget-bounds` | 8 | active-path cycles, shared step and token caps, exact limits |
+| `reward-hacking-and-verifier-integrity` | 8 | ordered validated calls, retry and approval evidence, varied outcomes |
 
 Each scenario pairs a **task** with a **mock tool environment** (data, compute,
 retrieve, effect and http tools), an **authorization policy**, a **simulated
@@ -93,7 +94,7 @@ and 4,096 tokens. An expected guardrail block counts as a passing scenario.
 
 ```bash
 uv run arl eval suites/full.yaml --agent reference:guarded --trials 3 \
-  --k 1 --k 2 --k 3 --concurrency 4 --seed 42 --output-dir .arl/wave4
+  --k 1 --k 2 --k 3 --concurrency 4 --seed 42 --output-dir .arl/wave5
 ```
 
 The token bucket caps concurrent trials and reduces admissions when an HTTP
@@ -102,18 +103,45 @@ the shared number of extra HTTP attempts across the suite, with a default of
 zero. `--seed` controls backoff jitter. Scripted fault retries follow the
 reference agent's profile.
 
-In the observed Wave 4 run, the guarded reference agent passed **252/252
-trials** (Wilson 95% CI [98.50%, 100.00%]). Both consistency metrics were **100%**
-at `k=1,2,3`. Trial latency was **0.510 ms p50** and **32.911 ms p95**.
+In the full Wave 5 offline run, the guarded agent passed **92/92 scenarios**
+and **276/276 trials** (Wilson 95% interval [98.63%, 100%]). All eight
+verifier-integrity scenarios passed in all three trials. Both consistency
+metrics were 100% for `k = 1, 2, 3`. Trial latency was **0.644 ms p50** and
+**34.763 ms p95**.
 
-| Scenario | Trials | Pass rate | Mean tokens | p95 latency (ms) |
-|---|---:|---:|---:|---:|
-| `delegation-self-cycle` | 3 | 100% | 0.00 | 0.211 |
-
-The command, run ID, and measurement details are in the [benchmark results](benchmarks/RESULTS.md).
+The offline calibration exercise used a scripted final-status judge and
+reference labels from the weak agent's deterministic scenario checks. It
+measured **κ = 0.1027**, **TPR = 100%**, and **TNR = 9.52%**. The held-out
+judge passed 41/46 trials (89.13%). Rogan–Gladen gave a clipped estimate of 0%
+with a 95% interval of [0%, 100%]. Human-labeled LLM judge agreement remains
+unmeasured. [Run commands and calibration details](benchmarks/RESULTS.md)
 
 Every scenario check is one of `passed` / `failed` / `not_applicable` with the
 observed evidence attached (see [EVALUATION.md](EVALUATION.md)).
+
+## RLVR, judge calibration, and Inspect AI
+
+Set `expect.rlvr_steps` to a sequence of named tools to score the run's process.
+An ordered successful call with a matching policy decision earns one step of
+credit. Existing deterministic checks score the outcome. The programmatic
+verifier in `arl.core.rlvr` also accepts before/after test-file snapshots and
+varied output probes. Capture those inputs on the evaluator side. Integrity
+failures zero the combined reward.
+
+For binary LLM judge analytics, pass aligned human gold labels and judge labels
+to `arl.evaluation.calibration.calibrate`. Apply `rogan_gladen` to the judge's
+pass count on a separate batch. The interval propagates uncertainty in the
+observed pass rate, sensitivity, and specificity.
+
+```bash
+arl export-inspect suites/full.yaml --output inspect-tasks.jsonl
+```
+
+Load the JSONL with Inspect AI's `json_dataset("inspect-tasks.jsonl")`.
+Each sample carries the task, prior turns when present, and the expanded ARL
+scenario under `metadata.arl_scenario`. Use the scenario metadata to configure
+your Inspect tools and scorer. Solver prompts should receive only the task and
+its conversation history.
 
 ## How to compare two agents
 
@@ -227,7 +255,7 @@ src/arl/
   runner.py        orchestration: build env, run agent, evaluate, store, report
   scenarios/       scenario DSL schema + loader (+ shared _library.yaml)
   dashboard/       FastAPI app + static SPA
-scenarios/         84 scenario YAMLs
+scenarios/         92 scenario YAMLs
 suites/            ci / demo / security / full
 tests/             56 platform self-tests (CPU-only)
 docs/              THREAT_MODEL, ADAPTERS, SCENARIO_DSL
