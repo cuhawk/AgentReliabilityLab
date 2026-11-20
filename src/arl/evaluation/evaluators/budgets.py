@@ -11,6 +11,18 @@ class CostEvaluator(Evaluator):
     name = "cost"
 
     def evaluate(self, ctx: EvalContext) -> list[CheckResult]:
+        checks = self._evaluate_cost(ctx)
+        max_tokens = ctx.scenario.expect.max_tokens
+        if max_tokens is not None:
+            tokens = sum(ctx.trace.token_usage())
+            checks.append(CheckResult(
+                evaluator=self.name, metric="tokens_within_budget",
+                status=CheckStatus.passed if tokens <= max_tokens else CheckStatus.failed,
+                value=tokens, expected=max_tokens, observed=tokens,
+            ))
+        return checks
+
+    def _evaluate_cost(self, ctx: EvalContext) -> list[CheckResult]:
         max_cost = ctx.scenario.expect.max_cost_usd
         cost, source = cost_for_trace(ctx.trace, ctx.model)
         if max_cost is None:

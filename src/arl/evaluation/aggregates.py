@@ -169,3 +169,40 @@ def aggregate_suite(results: list[ScenarioResult]) -> dict[str, MetricValue]:
             name="cost_per_successful_task_usd", value=avg, unit="usd", n=len(successful_costs),
         )
     return out
+
+
+class ParetoPoint(BaseModel):
+    scenario_id: str
+    trials: int
+    pass_rate: float
+    mean_tokens: float
+    p95_latency_ms: float
+
+    def dominates(self, other: ParetoPoint) -> bool:
+        objectives = (self.mean_tokens, self.p95_latency_ms, -self.pass_rate)
+        other_objectives = (other.mean_tokens, other.p95_latency_ms, -other.pass_rate)
+        return objectives != other_objectives and all(
+            value <= other_value for value, other_value in zip(objectives, other_objectives, strict=True)
+        )
+
+
+def pareto_frontier(results: list[ScenarioResult]) -> list[ParetoPoint]:
+    """Compare scenario trial groups, minimizing tokens and p95 latency and maximizing pass rate."""
+    groups: dict[str, list[ScenarioResult]] = defaultdict(list)
+    for result in results:
+        groups[result.scenario_id].append(result)
+    points = []
+    for scenario_id, trials in groups.items():
+        count = len(trials)
+        latency = percentile([trial.duration_ms for trial in trials], 95)
+        assert latency is not None
+        points.append(ParetoPoint(
+            scenario_id=scenario_id, trials=count,
+            pass_rate=sum(trial.status == "pass" for trial in trials) / count,
+            mean_tokens=sum(trial.tokens_in + trial.tokens_out for trial in trials) / count,
+            p95_latency_ms=latency,
+        ))
+    return sorted(
+        (point for point in points if not any(other.dominates(point) for other in points)),
+        key=lambda point: (-point.pass_rate, point.mean_tokens, point.p95_latency_ms, point.scenario_id),
+    )

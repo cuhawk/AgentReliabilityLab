@@ -21,7 +21,7 @@ Task → Agent adapter → Tool calls → Fault injection → Trace recorder
 
 ## What is tested
 
-**76 scenarios across 15 categories** ship with the repo (all offline, all
+**84 scenarios across 16 categories** ship with the repo (all offline, all
 deterministic):
 
 | Category | Scenarios | What it probes |
@@ -41,6 +41,7 @@ deterministic):
 | `latency` | 1 | per-task latency budgets |
 | `context-poisoning` | 7 | trusted conversation history and persisted memory integrity |
 | `mcp-schema-confusion` | 7 | cross-server boundaries using mock MCP result envelopes |
+| `delegation-loop-and-budget-bounds` | 8 | active-path cycles, shared step and token caps, exact limits |
 
 Each scenario pairs a **task** with a **mock tool environment** (data, compute,
 retrieve, effect and http tools), an **authorization policy**, a **simulated
@@ -81,10 +82,18 @@ The reporter provides p50 and p95 trial latency and averages consistency across
 scenarios. `pass@k` measures the probability that at least one of `k` sampled
 trials passes, and `pass^k` measures the probability that all `k` pass.
 Both sample without replacement from each scenario's observed trials.
+The Pareto table groups trials by scenario and shows the best observed
+tradeoffs among pass rate, mean total tokens, and p95 latency within the run.
+
+The reference agent can execute scripted handoffs declared in a scenario's
+`delegation` graph. It blocks a target already on the active path and shares
+`max_steps` and `max_tokens` across branches. Each admitted handoff consumes one
+step and its declared `tokens_per_handoff`. The runtime defaults are 12 steps
+and 4,096 tokens. An expected guardrail block counts as a passing scenario.
 
 ```bash
 uv run arl eval suites/full.yaml --agent reference:guarded --trials 3 \
-  --k 1 --k 2 --k 3 --concurrency 4 --seed 42 --output-dir .arl/wave3
+  --k 1 --k 2 --k 3 --concurrency 4 --seed 42 --output-dir .arl/wave4
 ```
 
 The token bucket caps concurrent trials and reduces admissions when an HTTP
@@ -93,10 +102,15 @@ the shared number of extra HTTP attempts across the suite, with a default of
 zero. `--seed` controls backoff jitter. Scripted fault retries follow the
 reference agent's profile.
 
-In the observed Wave 3 run, the guarded reference agent passed **228/228
-trials**. Both consistency metrics were **100%** at
-`k=1,2,3`. Trial latency was **0.553 ms p50** and **33.137 ms p95**.
-See [benchmark results](benchmarks/RESULTS.md).
+In the observed Wave 4 run, the guarded reference agent passed **252/252
+trials** (Wilson 95% CI [98.50%, 100.00%]). Both consistency metrics were **100%**
+at `k=1,2,3`. Trial latency was **0.510 ms p50** and **32.911 ms p95**.
+
+| Scenario | Trials | Pass rate | Mean tokens | p95 latency (ms) |
+|---|---:|---:|---:|---:|
+| `delegation-self-cycle` | 3 | 100% | 0.00 | 0.211 |
+
+The command, run ID, and measurement details are in the [benchmark results](benchmarks/RESULTS.md).
 
 Every scenario check is one of `passed` / `failed` / `not_applicable` with the
 observed evidence attached (see [EVALUATION.md](EVALUATION.md)).
@@ -213,7 +227,7 @@ src/arl/
   runner.py        orchestration: build env, run agent, evaluate, store, report
   scenarios/       scenario DSL schema + loader (+ shared _library.yaml)
   dashboard/       FastAPI app + static SPA
-scenarios/         76 scenario YAMLs
+scenarios/         84 scenario YAMLs
 suites/            ci / demo / security / full
 tests/             56 platform self-tests (CPU-only)
 docs/              THREAT_MODEL, ADAPTERS, SCENARIO_DSL

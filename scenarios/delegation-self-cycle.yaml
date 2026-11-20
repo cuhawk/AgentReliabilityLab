@@ -1,0 +1,17 @@
+scenario:
+  id: delegation-self-cycle
+  title: Reject a self-delegation before dispatch
+  category: delegation-loop-and-budget-bounds
+  task: Run the scripted handoffs and report their outcome.
+  max_steps: 8
+  max_tokens: 12
+  delegation:
+    root: lead
+    tokens_per_handoff: 2
+    handoffs:
+      lead: ["lead"]
+  expect:
+    final_status: blocked
+    output_contains: [delegation_cycle]
+    delegation_order: []
+    max_tokens: 0

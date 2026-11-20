@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from arl.core.events import EventType
 from arl.core.trace import Trace
 from arl.evaluation.base import (
     M_CONTAINS,
@@ -52,6 +53,14 @@ class CompletionEvaluator(Evaluator):
                     message="" if passed else f"agent ended '{actual}', expected '{expect.final_status}'",
                 )
             )
+
+        if expect.delegation_order is not None:
+            observed = [event.name for event in ctx.trace.by_type(EventType.DELEGATION)]
+            checks.append(CheckResult(
+                evaluator=self.name, metric="delegation_order",
+                status=CheckStatus.passed if observed == expect.delegation_order else CheckStatus.failed,
+                expected=expect.delegation_order, observed=observed,
+            ))
 
         if expect.output_contains:
             text = ctx.output_text()

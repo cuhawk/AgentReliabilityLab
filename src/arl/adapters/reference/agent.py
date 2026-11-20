@@ -12,9 +12,10 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from collections.abc import Iterator
 from typing import Any
 
-from arl.adapters.base import AgentAdapter, AgentState, AgentStatus, ModelCallError
+from arl.adapters.base import AgentAdapter, AgentState, AgentStatus, ModelCallError, RunGuardrailBlocked
 from arl.adapters.reference.intents import PlanStep, build_plan, entities_of, pick_tool_for_step
 from arl.adapters.reference.profiles import ReferenceAgentConfig
 from arl.environment.env import ToolEnvironment, ToolManifest
@@ -26,6 +27,7 @@ from arl.environment.errors import (
 )
 from arl.evaluation.evaluators.completion import validate_against_schema
 from arl.recording.recorder import TraceRecorder
+from arl.scenarios.schema import DelegationSpec
 
 _EXFIL_URL_RE = re.compile(r"https?://[^\s\"']+")
 _SECRET_WORD_RE = re.compile(r"\b(environment variables|env vars|credentials|secrets|api keys?)\b", re.I)
@@ -118,6 +120,11 @@ class ReferenceAgent(AgentAdapter):
         await self.emit_start()
         self._state.status = AgentStatus.running
         try:
+            if self._task.delegation is not None:
+                await self._run_delegations(self._task.delegation)
+                await self.emit_complete("delegation completed")
+                self._state.status = AgentStatus.completed
+                return
             await self._restore_state()
             for index, step in enumerate(self._plan):
                 if self._cancelled:
@@ -130,6 +137,9 @@ class ReferenceAgent(AgentAdapter):
                 await self._execute_step(step, index)
             await self._compose()
             self._state.status = AgentStatus.completed
+        except RunGuardrailBlocked as exc:
+            self._state.status = AgentStatus.failed
+            await self.emit_complete(exc.reason, status="blocked", note=exc.reason)
         except EnvironmentInterrupted:
             self._state.status = AgentStatus.failed
             await self.emit_error("run interrupted", kind="interrupted")
@@ -143,6 +153,18 @@ class ReferenceAgent(AgentAdapter):
         except Exception as exc:
             self._state.status = AgentStatus.failed
             await self.emit_error(f"{type(exc).__name__}: {exc}", kind="agent_crash")
+
+    async def _run_delegations(self, spec: DelegationSpec) -> None:
+        # A stack of iterators preserves declared order without Python recursion.
+        stack: list[tuple[tuple[str, ...], Iterator[str]]] = [((spec.root,), iter(spec.handoffs.get(spec.root, [])))]
+        while stack:
+            path, targets = stack[-1]
+            target = next(targets, None)
+            if target is None:
+                stack.pop()
+                continue
+            child_path = await self.admit_delegation(path, target, tokens=spec.tokens_per_handoff)
+            stack.append((child_path, iter(spec.handoffs.get(target, []))))
 
     async def _restore_state(self) -> None:
         try:
@@ -357,17 +379,20 @@ class ReferenceAgent(AgentAdapter):
     async def _model_call(self, *, is_content: bool, step_index: int) -> str | None:
         """Emit MODEL_REQUEST/RESPONSE and apply model faults. Returns the
         content-fault marker (or None). Availability faults retry here."""
-        fault = await self._env.injector.take_model_fault(content_call=is_content)
-        if fault is not None and fault.fault.value in ("backend_unavailable", "model_rate_limit"):
+        while True:
+            fault = await self._env.injector.take_model_fault(content_call=is_content)
+            if fault is None or fault.fault.value not in ("backend_unavailable", "model_rate_limit"):
+                break
+            self.reserve_step()
             kind = fault.fault.value
-            if self._model_retries < self.config.model_max_retries:
-                self._model_retries += 1
-                await self._recorder.emit_retry("model", self._model_retries, kind)
-                return await self._model_call(is_content=is_content, step_index=step_index)
-            raise ModelCallError(f"model {kind}", kind=kind, retriable=False)
+            if self._model_retries >= self.config.model_max_retries:
+                raise ModelCallError(f"model {kind}", kind=kind, retriable=False)
+            self._model_retries += 1
+            await self._recorder.emit_retry("model", self._model_retries, kind)
         input_tokens = (len(self._task.task) + len(json.dumps(self._findings, default=str))) // 4 + 10
+        output_tokens = 60 if is_content else 24
+        self.reserve_step(input_tokens + output_tokens)
         await self._recorder.emit_model_request(step=step_index, input_tokens=input_tokens)
-        output_tokens = 24 if not is_content else 60
         await self._recorder.emit_model_response(
             step=step_index, input_tokens=input_tokens, output_tokens=output_tokens,
             preview="scripted decision" if not is_content else "scripted answer",

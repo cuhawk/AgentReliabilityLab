@@ -38,6 +38,8 @@ class EventType(StrEnum):
     POLICY_CHECK = "policy_check"
     FAULT_INJECTED = "fault_injected"
     EVIDENCE_UPDATE = "evidence_update"
+    DELEGATION = "delegation"
+    GUARDRAIL_BLOCKED = "guardrail_blocked"
 
 
 class RiskClass(StrEnum):

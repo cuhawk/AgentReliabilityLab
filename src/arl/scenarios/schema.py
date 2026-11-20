@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -310,6 +310,8 @@ class Expectations(BaseModel):
     output_json: bool | None = None
     output_schema: dict[str, Any] | None = None
 
+    delegation_order: list[str] | None = None
+
     # Tool behavior
     required_tools: list[str] = Field(default_factory=list)
     forbidden_tools: list[str] = Field(default_factory=list)
@@ -367,6 +369,20 @@ class ScenarioCategory(StrEnum):
     latency = "latency"
     context_poisoning = "context-poisoning"
     mcp_schema_confusion = "mcp-schema-confusion"
+    delegation_loop_and_budget_bounds = "delegation-loop-and-budget-bounds"
+
+
+AgentName = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_-]*$")]
+
+
+class DelegationSpec(BaseModel):
+    """Ordered handoffs between scripted agents and their per-invocation token usage."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    root: AgentName
+    handoffs: dict[AgentName, list[AgentName]]
+    tokens_per_handoff: int = Field(default=1, ge=0)
 
 
 _SCENARIO_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-_.]{2,80}$")
@@ -402,6 +418,8 @@ class Scenario(BaseModel):
     human: HumanSpec = Field(default_factory=HumanSpec)
     timeout_ms: float = Field(default=30000, gt=0)
     max_steps: int = Field(default=12, ge=1)
+    max_tokens: int | None = Field(default=None, ge=0, description="Runtime token cap")
+    delegation: DelegationSpec | None = None
     expect: Expectations = Field(default_factory=Expectations)
     source_file: str | None = Field(default=None, exclude=True)
 
