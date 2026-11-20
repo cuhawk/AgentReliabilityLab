@@ -15,7 +15,7 @@ import asyncio
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 import click
 from click import group
@@ -76,6 +76,28 @@ def _print_summary(run: Any) -> None:
 @group()
 def cli() -> None:
     """AgentReliabilityLab: measurable, recoverable, secure agents."""
+
+
+@cli.command("export-inspect")
+@click.argument("suite_path")
+@click.option("--output", "-o", type=click.File("w", encoding="utf-8"), default="-", show_default=True)
+def export_inspect(suite_path: str, output: TextIO) -> None:
+    """Export Inspect AI Sample JSONL for a suite or scenario."""
+    from arl.scenarios.loader import ScenarioError
+
+    try:
+        _, scenarios = _load_suite_or_scenario(suite_path)
+    except ScenarioError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    for scenario in scenarios:
+        messages = [{"role": "user", "content": turn} for turn in [*scenario.prior_turns, scenario.task]]
+        sample = {
+            "id": scenario.id,
+            "input": messages if scenario.prior_turns else scenario.task,
+            "metadata": {"arl_scenario": scenario.model_dump(mode="json")},
+        }
+        click.echo(json.dumps(sample, ensure_ascii=False), file=output)
 
 
 @cli.command()

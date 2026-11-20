@@ -7,9 +7,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from arl.core.rlvr import verify
 from arl.core.trace import Trace
 from arl.environment.env import EffectRecord, ViolationRecord
 from arl.evaluation.base import (
+    CheckKind,
     CheckResult,
     CheckStatus,
     EvalContext,
@@ -115,6 +117,32 @@ def evaluate_scenario(
                     message="evaluator crashed — treat the scenario as failed",
                 )
             )
+    rewards: dict[str, float] = {}
+    if scenario.expect.rlvr_steps:
+        reward = verify(
+            trace,
+            required_steps=scenario.expect.rlvr_steps,
+            outcome_passed=not any(
+                c.status is CheckStatus.failed for c in checks if c.kind is CheckKind.deterministic
+            ),
+        )
+        checks.append(CheckResult(
+            evaluator="rlvr", metric="verifier_integrity",
+            status=CheckStatus.failed if reward.integrity_failures else CheckStatus.passed,
+            observed=reward.integrity_failures,
+        ))
+        checks.append(CheckResult(
+            evaluator="rlvr", metric="verified_process",
+            status=CheckStatus.passed if reward.process_reward == 1 else CheckStatus.failed,
+            expected=scenario.expect.rlvr_steps,
+            observed=[step.reward for step in reward.steps],
+            value=reward.process_reward,
+        ))
+        rewards = {
+            "rlvr_process_reward": reward.process_reward,
+            "rlvr_outcome_reward": float(reward.outcome_reward),
+            "rlvr_total_reward": reward.total_reward,
+        }
     tokens_in, tokens_out = trace.token_usage()
     retries = len(trace.retry_events)
     result = ScenarioResult(
@@ -129,6 +157,7 @@ def evaluate_scenario(
         duration_ms=trace.duration_ms,
         checks=checks,
         metrics={
+            **rewards,
             "latency_ms": round(trace.duration_ms, 3),
             "cost_usd": round(cost_of(checks), 6),
             "tool_calls": float(len(trace.tool_calls)),

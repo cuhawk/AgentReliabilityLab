@@ -1,40 +1,70 @@
-# Wave 4 benchmark results
+# Wave 5 offline benchmark results
 
-Run `run-20261120-063124-daf3b986` evaluated the guarded reference agent offline on
-Python 3.12.14 with three trials per scenario across all 84
-scenarios in 16 categories and concurrency capped at four.
+The guarded run `run-20261120-081138-7ef1bd7f` and weak run
+`run-20261120-081139-ddbcd690` evaluated all 92 scenarios in 17 categories on
+Python 3.12.14. Latency measures scenario execution and excludes scheduler queue
+time.
 
 ```bash
 uv run arl eval suites/full.yaml --agent reference:guarded --trials 3 \
-  --k 1 --k 2 --k 3 --concurrency 4 --seed 42 --output-dir .arl/wave4 --db .arl/wave4/runs.sqlite
+  --k 1 --k 2 --k 3 --concurrency 4 --seed 42 --output-dir .arl/wave5 --formats json
+uv run arl eval suites/full.yaml --agent reference:weak --concurrency 4 \
+  --seed 42 --output-dir .arl/wave5-weak --formats json --no-fail
 ```
 
-| Metric | Observed |
+| Agent | Passed trials | Trial pass rate | Wilson 95% interval | p50 trial latency | p95 trial latency |
+|---|---:|---:|---:|---:|---:|
+| Guarded | 276/276 | 100% | [98.63%, 100%] | 0.644 ms | 34.763 ms |
+| Weak | 44/92 | 47.83% | [37.91%, 57.91%] | 0.745 ms | 9.002 ms |
+
+The guarded agent passed all 92 scenarios in each of the three trials, including
+24/24 trials across the eight verifier-integrity scenarios. Both `pass@k` and
+`pass^k` were 100% for `k = 1, 2, 3`. Repeated deterministic trials share
+fixtures, which limits the interpretation of the pooled Wilson interval.
+
+## Offline calibration exercise
+
+The exercise used observed weak-agent outcomes. A scripted judge passed a
+sample when its reported final status matched the scenario's expected final
+status. Full deterministic scenario verdicts served as reference labels. The
+46 even-indexed scenarios sorted by ID formed the calibration set, and the 46
+odd-indexed scenarios formed the held-out batch. Human-labeled LLM judge
+agreement remains unmeasured.
+
+| Metric | Result |
 |---|---:|
-| Passed trials | 252/252 |
-| Trial pass rate | 100% |
-| Trial pass rate, Wilson 95% CI | [98.50%, 100.00%] |
-| p50 trial latency | 0.510 ms |
-| p95 trial latency | 32.911 ms |
+| Calibration count (TP / TN / FP / FN) | 25 / 2 / 19 / 0 |
+| Cohen’s κ | 0.1027 |
+| TPR | 100% |
+| TNR | 9.52% |
+| Held-out scripted judge pass rate | 41/46 (89.13%) |
+| Held-out deterministic pass rate | 19/46 (41.30%) |
+| Held-out Rogan–Gladen estimate | 0% (clipped) |
+| Held-out Rogan–Gladen 95% interval | [0%, 100%] |
 
-| k | pass@k | pass^k | Scenarios |
-|---:|---:|---:|---:|
-| 1 | 100% | 100% | 84 |
-| 2 | 100% | 100% | 84 |
-| 3 | 100% | 100% | 84 |
+The interval spans the full range because the calibration uncertainty allows
+`TPR + TNR − 1` to cross zero.
 
-## Cost vs. reliability Pareto frontier
+```python
+import json
+from pathlib import Path
 
-| Scenario | Trials | Pass rate | Mean tokens | p95 latency (ms) |
-|---|---:|---:|---:|---:|
-| `delegation-self-cycle` | 3 | 100% | 0.00 | 0.211 |
+from arl.evaluation.calibration import calibrate, rogan_gladen
+from arl.scenarios.suite import load_suite
 
-The frontier compares scenario trial groups within this run. Each row has no
-other scenario with an equal or higher pass rate, equal or lower mean total
-tokens, and equal or lower p95 latency with at least one strict improvement.
-Token totals include input and output, and costs include all trials. A trial
-passes if it meets its scenario expectations, including an expected block.
+path = Path(".arl/wave5-weak/run-20261120-081139-ddbcd690/report.json")
+rows = sorted(json.loads(path.read_text())["scenarios"], key=lambda row: row["scenario_id"])
+_, scenarios = load_suite("suites/full.yaml")
+expected = {scenario.id: scenario.expect.final_status for scenario in scenarios}
 
-Latency measures scenario execution and excludes scheduler queue time. The Wilson
-interval pools trial outcomes. Repeated deterministic trials share fixtures, so
-interpret the interval with that dependence in mind.
+def judge(row):
+    return row["final_status"] == expected[row["scenario_id"]]
+
+calibration = calibrate(
+    gold=[row["status"] == "pass" for row in rows[::2]],
+    judged=[judge(row) for row in rows[::2]],
+)
+held_out = rows[1::2]
+print(calibration)
+print(rogan_gladen(calibration, judged_passes=sum(map(judge, held_out)), total=len(held_out)))
+```
