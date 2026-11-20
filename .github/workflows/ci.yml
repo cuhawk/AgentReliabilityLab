@@ -33,7 +33,7 @@ jobs:
       - run: uv sync --frozen
       # Fails the build when the guarded reference agent drops below the
       # suite's expectations (task success, authz, secrets, injection...).
-      - run: uv run arl eval suites/ci.yaml
+      - run: uv run arl eval suites/ci.yaml --trials 2 --concurrency 4
 
   demo:
     name: offline demo smoke
@@ -52,5 +52,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t arl .
-      - run: docker run --rm arl --version
-      - run: docker run --rm arl eval suites/ci.yaml
+      - run: docker run --rm arl version
+      - run: docker run --rm arl eval suites/ci.yaml --trials 2 --concurrency 4

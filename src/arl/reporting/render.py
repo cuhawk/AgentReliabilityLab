@@ -35,6 +35,7 @@ def build_report_dict(run: BaseModel, comparison: dict[str, Any] | None = None) 
         "scenarios": [
             {
                 "scenario_id": r.scenario_id,
+                "trial": r.trial,
                 "title": r.title,
                 "category": r.category,
                 "status": r.status,
@@ -45,13 +46,14 @@ def build_report_dict(run: BaseModel, comparison: dict[str, Any] | None = None) 
                 "tool_calls": r.tool_calls,
                 "retries": r.retries,
                 "violations": [v.model_dump() for v in r.violations],
-                "trace_link": f"traces/{r.scenario_id}.trace.txt",
+                "trace_link": f"traces/{r.result_id}.trace.txt",
             }
             for r in results
         ],
         "failed_scenarios": [
             {
                 "scenario_id": r.scenario_id,
+                "trial": r.trial,
                 "category": r.category,
                 "failed_checks": [
                     {
@@ -63,7 +65,7 @@ def build_report_dict(run: BaseModel, comparison: dict[str, Any] | None = None) 
                     }
                     for c in r.failed_checks
                 ],
-                "trace_link": f"traces/{r.scenario_id}.trace.txt",
+                "trace_link": f"traces/{r.result_id}.trace.txt",
             }
             for r in failed
         ],
@@ -79,9 +81,9 @@ def write_reports(run: BaseModel, output_dir: Path, *, formats: list[str],
 
     prime_trace_cache(run)
     for result in run.results:  # type: ignore[attr-defined]
-        (traces_dir / f"{result.scenario_id}.trace.txt").write_text(result.trace_text, encoding="utf-8")
+        (traces_dir / f"{result.result_id}.trace.txt").write_text(result.trace_text, encoding="utf-8")
         if result.trace is not None:
-            (traces_dir / f"{result.scenario_id}.trace.json").write_text(
+            (traces_dir / f"{result.result_id}.trace.json").write_text(
                 json.dumps(result.trace.model_dump(), indent=2, default=str), encoding="utf-8"
             )
 
@@ -117,7 +119,7 @@ def render_markdown(report: dict[str, Any]) -> str:
                  f"ARL {report['environment'].get('arl_version')}, {report['environment'].get('platform')}")
     lines.append("")
     s = report["summary"]
-    lines.append(f"**{s['passed']}/{s['total']} scenarios passed.**")
+    lines.append(f"**{s['passed']}/{s['total']} scenario trials passed.**")
     lines.append("")
 
     lines.append("## Metrics")
@@ -148,7 +150,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     if report["failed_scenarios"]:
         lines.append("## Failed scenarios")
         for f in report["failed_scenarios"]:
-            lines.append(f"### `{f['scenario_id']}` ({f['category']})")
+            lines.append(f"### `{f['scenario_id']}` ({f['category']}, trial {f['trial']})")
             for c in f["failed_checks"]:
                 lines.append(f"* **{c['metric']}** — expected {c['expected']!r}, observed {c['observed']!r}")
                 if c.get("message"):
@@ -158,12 +160,12 @@ def render_markdown(report: dict[str, Any]) -> str:
 
     lines.append("## All scenarios")
     lines.append("")
-    lines.append("| Scenario | Category | Status | Final | Faults | Tool calls | Retries | Trace |")
-    lines.append("|---|---|---|---|---|---|---|---|")
+    lines.append("| Scenario | Trial | Category | Status | Final | Faults | Tool calls | Retries | Trace |")
+    lines.append("|---|---|---|---|---|---|---|---|---|")
     for sc in report["scenarios"]:
         faults = ", ".join(sc["faults"]) or "—"
         lines.append(
-            f"| `{sc['scenario_id']}` | {sc['category']} | {sc['status']} | {sc['final_status']} "
+            f"| `{sc['scenario_id']}` | {sc['trial']} | {sc['category']} | {sc['status']} | {sc['final_status']} "
             f"| {faults} | {sc['tool_calls']} | {sc['retries']} | `{sc['trace_link']}` |"
         )
     lines.append("")
@@ -211,7 +213,7 @@ def render_html(report: dict[str, Any]) -> str:
     for sc in report["scenarios"]:
         cls = "pass" if sc["status"] == "pass" else "fail"
         scenario_rows.append(
-            f"<tr><td><code>{e(sc['scenario_id'])}</code></td><td>{e(sc['category'])}</td>"
+            f"<tr><td><code>{e(sc['scenario_id'])}</code></td><td>{sc['trial']}</td><td>{e(sc['category'])}</td>"
             f"<td class='{cls}'>{sc['status']}</td><td>{e(sc['final_status'])}</td>"
             f"<td>{e(', '.join(sc['faults']) or '—')}</td><td class='num'>{sc['tool_calls']}</td>"
             f"<td class='num'>{sc['retries']}</td><td><code>{e(sc['trace_link'])}</code></td></tr>"
@@ -249,7 +251,7 @@ def render_html(report: dict[str, Any]) -> str:
     traces_html = []
     for sc in report["scenarios"]:
         if sc["status"] != "pass":
-            trace_text = _trace_text_cache.get(sc["scenario_id"], "")
+            trace_text = _trace_text_cache.get(sc["trace_link"], "")
             traces_html.append(f"<h3><code>{e(sc['scenario_id'])}</code></h3><pre>{e(trace_text)}</pre>")
 
     stamp = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(report["created_at"]))
@@ -267,7 +269,7 @@ def render_html(report: dict[str, Any]) -> str:
 <h2>Failed scenarios</h2>
 {''.join(failures_html) if failures_html else '<p class="pass">None — all scenarios passed.</p>'}
 <h2>All scenarios</h2>
-<table><tr><th>Scenario</th><th>Category</th><th>Status</th><th>Final</th><th>Faults</th>
+<table><tr><th>Scenario</th><th>Trial</th><th>Category</th><th>Status</th><th>Final</th><th>Faults</th>
 <th>Tools</th><th>Retries</th><th>Trace</th></tr>{''.join(scenario_rows)}</table>
 <h2>Failure traces</h2>
 {''.join(traces_html)}
@@ -281,4 +283,4 @@ def prime_trace_cache(run: BaseModel) -> None:
     """Called by write_reports so failed traces can be embedded in HTML."""
     _trace_text_cache.clear()
     for r in run.results:  # type: ignore[attr-defined]
-        _trace_text_cache[r.scenario_id] = r.trace_text
+        _trace_text_cache[f"traces/{r.result_id}.trace.txt"] = r.trace_text

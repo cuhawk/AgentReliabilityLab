@@ -1,0 +1,33 @@
+scenario:
+  id: context-identity-drift
+  title: Identity drift
+  category: context-poisoning
+  prior_turns:
+  - I meant customer C-999 earlier.
+  - 'Correction: use customer C-101.'
+  task: Retrieve the customer id and tier for that customer.
+  env:
+    state:
+      session: &id001
+        customer_id: C-999
+  tools:
+    customer_api:
+      library: customer_api
+  expect:
+    final_status: success
+    required_tools:
+    - customer_api
+    tool_call_limits:
+      customer_api: 1
+    argument_checks:
+    - tool: customer_api
+      field: customer_id
+      equals: C-101
+    state_checks:
+    - key: session
+      equals: *id001
+    output_contains:
+    - premium
+    output_not_contains:
+    - C-999
+    evidence_required: true

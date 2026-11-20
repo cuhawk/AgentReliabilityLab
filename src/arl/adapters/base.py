@@ -10,13 +10,16 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import StrEnum
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from arl.core.events import EventType
 from arl.environment.env import ToolEnvironment, ToolManifest
 from arl.recording.recorder import TraceRecorder
+
+if TYPE_CHECKING:
+    from arl.scheduler import EvaluationScheduler
 
 
 class AgentStatus(StrEnum):
@@ -42,6 +45,7 @@ class TaskInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     task: str
+    prior_turns: list[str] = Field(default_factory=list)
     scenario_id: str
     tools: list[ToolManifest]
     env: dict[str, Any] = Field(default_factory=dict)  # variables, allowlisted_domains
@@ -64,6 +68,8 @@ class AgentAdapter(ABC):
         self._env = env
         self._task = task
         self._cancelled = False
+        self.scheduler: EvaluationScheduler | None = None
+        self.request_key = task.scenario_id
 
     @abstractmethod
     async def start_task(self) -> None:
@@ -86,6 +92,10 @@ class AgentAdapter(ABC):
     @abstractmethod
     def get_state(self) -> AgentState:
         """Current agent state snapshot."""
+
+    async def aclose(self) -> None:
+        """Release adapter resources after a scenario trial."""
+        return None
 
     # --- shared helpers ---------------------------------------------------
 

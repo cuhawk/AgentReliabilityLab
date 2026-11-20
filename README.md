@@ -21,7 +21,7 @@ Task → Agent adapter → Tool calls → Fault injection → Trace recorder
 
 ## What is tested
 
-**62 scenarios across 13 categories** ship with the repo (all offline, all
+**76 scenarios across 15 categories** ship with the repo (all offline, all
 deterministic):
 
 | Category | Scenarios | What it probes |
@@ -39,6 +39,8 @@ deterministic):
 | `hallucination` | 3 | no phantom citations, no invented fields, no unsupported claims |
 | `cost` | 3 | token/cost budgets, bounded retry spend |
 | `latency` | 1 | per-task latency budgets |
+| `context-poisoning` | 7 | trusted conversation history and persisted memory integrity |
+| `mcp-schema-confusion` | 7 | cross-server boundaries using mock MCP result envelopes |
 
 Each scenario pairs a **task** with a **mock tool environment** (data, compute,
 retrieve, effect and http tools), an **authorization policy**, a **simulated
@@ -74,10 +76,27 @@ snapshot, policy violations): `completion`, `output_format`, `tools`,
 `tool_args`, `retry`, `state`, `evidence`, `authorization`, `approval`,
 `secrets`, `injection`, `cost`, `latency`.
 
-Aggregate metrics carry **Wilson 95% confidence intervals**; latency is
-reported as p50/p95 with percentile intervals. Nothing is averaged away
-silently: a metric that cannot be computed is omitted, and token counts are
-labeled `estimated` (chars/4) unless the backend reports real usage.
+Rate metrics include **Wilson 95% confidence intervals** where applicable.
+The reporter provides p50 and p95 trial latency and averages consistency across
+scenarios. `pass@k` measures the probability that at least one of `k` sampled
+trials passes, and `pass^k` measures the probability that all `k` pass.
+Both sample without replacement from each scenario's observed trials.
+
+```bash
+uv run arl eval suites/full.yaml --agent reference:guarded --trials 3 \
+  --k 1 --k 2 --k 3 --concurrency 4 --seed 42 --output-dir .arl/wave3
+```
+
+The token bucket caps concurrent trials and reduces admissions when an HTTP
+adapter encounters rate limits or connection failures. `--retry-budget` sets
+the shared number of extra HTTP attempts across the suite, with a default of
+zero. `--seed` controls backoff jitter. Scripted fault retries follow the
+reference agent's profile.
+
+In the observed Wave 3 run, the guarded reference agent passed **228/228
+trials**. Both consistency metrics were **100%** at
+`k=1,2,3`. Trial latency was **0.553 ms p50** and **33.137 ms p95**.
+See [benchmark results](benchmarks/RESULTS.md).
 
 Every scenario check is one of `passed` / `failed` / `not_applicable` with the
 observed evidence attached (see [EVALUATION.md](EVALUATION.md)).
@@ -117,7 +136,7 @@ works as a CI step. See [EVALUATION.md](EVALUATION.md#regression-testing).
 - run: arl eval suites/ci.yaml                  # exits 1 if the agent misses expectations
 ```
 
-`suites/ci.yaml` is a 12-scenario deterministic gate (task success, routing,
+`suites/ci.yaml` is a 26-scenario deterministic gate (task success, routing,
 retry recovery, authz, injection resistance, secret handling) that passes for
 the guarded reference agent with no network and no API keys. The bundled
 [.github/workflows/ci.yml](.github/workflows/ci.yml) runs ruff + mypy + pytest,
@@ -194,9 +213,9 @@ src/arl/
   runner.py        orchestration: build env, run agent, evaluate, store, report
   scenarios/       scenario DSL schema + loader (+ shared _library.yaml)
   dashboard/       FastAPI app + static SPA
-scenarios/         62 scenario YAMLs
+scenarios/         76 scenario YAMLs
 suites/            ci / demo / security / full
-tests/             53 platform self-tests (CPU-only)
+tests/             56 platform self-tests (CPU-only)
 docs/              THREAT_MODEL, ADAPTERS, SCENARIO_DSL
 examples/          custom adapter, agent config, MCP demo, budget gating
 ```

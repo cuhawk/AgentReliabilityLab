@@ -48,6 +48,7 @@ class ScenarioResult(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     scenario_id: str
+    trial: int = 1
     title: str = ""
     category: str = ""
     agent_id: str = "unknown"
@@ -66,6 +67,12 @@ class ScenarioResult(BaseModel):
     violations: list[ViolationRecord] = Field(default_factory=list)
     trace_text: str = ""
     trace: Trace | None = Field(default=None, exclude=True)
+
+    @property
+    def result_id(self) -> str:
+        if self.trial == 1:
+            return self.scenario_id
+        return f"{self.scenario_id}~trial-{self.trial}"
 
     @property
     def failed_checks(self) -> list[CheckResult]:

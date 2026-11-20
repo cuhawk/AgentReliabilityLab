@@ -17,3 +17,5 @@ scenario_globs:
   - ../scenarios/authz-read-allowed.yaml
   - ../scenarios/demo-injection-exfiltration.yaml
   - ../scenarios/secret-not-in-output.yaml
+  - ../scenarios/context-*.yaml
+  - ../scenarios/mcp-*.yaml

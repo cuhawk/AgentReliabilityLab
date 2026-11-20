@@ -55,7 +55,7 @@ def _load_suite_or_scenario(path: str) -> tuple[str, list]:
 
 def _print_summary(run: Any) -> None:
     click.echo(f"\nSuite '{run.suite_id}' · agent '{run.agent_id}' · run {run.run_id}")
-    click.echo(f"Passed {run.passed}/{len(run.results)} scenarios")
+    click.echo(f"Passed {run.passed}/{len(run.results)} scenario trials")
     for name, m in run.metrics.items():
         ci = ""
         if m.ci_low is not None:
@@ -89,6 +89,12 @@ def cli() -> None:
 @click.option("--trace-exporter", default="none", type=click.Choice(["none", "console", "otlp"]))
 @click.option("--category", "categories", multiple=True, help="Only run these categories.")
 @click.option("--tag", "tags", multiple=True, help="Only scenarios with these tags.")
+@click.option("--trials", type=click.IntRange(min=1), default=1, show_default=True)
+@click.option("--k", "ks", type=click.IntRange(min=1), multiple=True, help="Consistency sample size (repeatable).")
+@click.option("--concurrency", type=click.IntRange(min=1), default=1, show_default=True)
+@click.option("--retry-budget", type=click.IntRange(min=0), default=0, show_default=True,
+              help="Total extra HTTP attempts allowed across the suite.")
+@click.option("--seed", type=int, default=0, show_default=True, help="Seed for deterministic backoff jitter.")
 @click.option("--max-scenarios", type=int, default=None)
 @click.option("--model", default=None, help="Override model id used for cost calculation.")
 @click.option("--baseline", type=click.Path(exists=True), default=None,
@@ -106,6 +112,11 @@ def eval(
     trace_exporter: str,
     categories: tuple[str, ...],
     tags: tuple[str, ...],
+    trials: int,
+    ks: tuple[int, ...],
+    concurrency: int,
+    retry_budget: int,
+    seed: int,
     max_scenarios: int | None,
     model: str | None,
     baseline: str | None,
@@ -135,7 +146,10 @@ def eval(
     if agent_config_path:
         agent_config = yaml_safe_load(agent_config_path)
 
+    if any(k > trials for k in ks):
+        raise click.BadParameter("cannot exceed --trials", param_hint="--k")
     cfg = RunConfig(
+        trials=trials, ks=list(ks), concurrency=concurrency, retry_budget=retry_budget, seed=seed,
         agent_spec=agent,
         agent_config=agent_config,
         output_dir=Path(output_dir),

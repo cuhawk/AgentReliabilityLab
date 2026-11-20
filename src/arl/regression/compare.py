@@ -187,8 +187,18 @@ def _gate(threshold: MetricThreshold, row: ComparisonRow) -> str:
 def compare_scenarios(
     baseline_results: list[dict[str, Any]], candidate_results: list[dict[str, Any]]
 ) -> list[ScenarioRow]:
-    base = {sid: r.get("status") for r in baseline_results if (sid := r.get("scenario_id")) is not None}
-    cand = {sid: r.get("status") for r in candidate_results if (sid := r.get("scenario_id")) is not None}
+    def verdicts(results: list[dict[str, Any]]) -> dict[str, str | None]:
+        status_by_scenario: dict[str, str | None] = {}
+        for result in results:
+            sid = result.get("scenario_id")
+            if sid is None:
+                continue
+            if sid not in status_by_scenario or status_by_scenario[sid] == "pass":
+                status_by_scenario[sid] = result.get("status")
+        return status_by_scenario
+
+    base = verdicts(baseline_results)
+    cand = verdicts(candidate_results)
     return [
         ScenarioRow(scenario_id=sid, baseline=base.get(sid), candidate=cand.get(sid))
         for sid in sorted(set(base) | set(cand))
