@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from arl.core.events import EventType
 from arl.environment.env import ToolEnvironment, ToolManifest
 from arl.recording.recorder import TraceRecorder
+from arl.scenarios.schema import DelegationSpec
 
 if TYPE_CHECKING:
     from arl.scheduler import EvaluationScheduler
@@ -50,7 +51,15 @@ class TaskInput(BaseModel):
     tools: list[ToolManifest]
     env: dict[str, Any] = Field(default_factory=dict)  # variables, allowlisted_domains
     state: dict[str, Any] = Field(default_factory=dict)  # agent's persisted memory
-    max_steps: int = 12
+    max_steps: int = Field(default=12, ge=1)
+    max_tokens: int | None = Field(default=None, ge=0)
+    delegation: DelegationSpec | None = None
+
+
+class RunGuardrailBlocked(Exception):
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
 
 
 class AgentAdapter(ABC):
@@ -68,6 +77,10 @@ class AgentAdapter(ABC):
         self._env = env
         self._task = task
         self._cancelled = False
+        self._steps_used = 0
+        self._tokens_used = 0
+        self._token_limit = task.max_tokens if task.max_tokens is not None else 4096
+        self._blocked: str | None = None
         self.scheduler: EvaluationScheduler | None = None
         self.request_key = task.scenario_id
 
@@ -98,6 +111,36 @@ class AgentAdapter(ABC):
         return None
 
     # --- shared helpers ---------------------------------------------------
+
+    def reserve_step(self, tokens: int = 0) -> None:
+        """Reserve one unit of work before dispatch, using the shared run counters."""
+        if tokens < 0:
+            raise ValueError("token reservation must be nonnegative")
+        if self._blocked is not None:
+            raise RunGuardrailBlocked(self._blocked)
+        if self._steps_used >= self._task.max_steps:
+            self._blocked = "step_budget_exhausted"
+        elif self._tokens_used + tokens > self._token_limit:
+            self._blocked = "token_budget_exhausted"
+        if self._blocked is not None:
+            raise RunGuardrailBlocked(self._blocked)
+        self._steps_used += 1
+        self._tokens_used += tokens
+
+    async def admit_delegation(self, path: tuple[str, ...], target: str, *, tokens: int = 0) -> tuple[str, ...]:
+        """Check a handoff before execution and return the child's active path."""
+        next_path = (*path, target)
+        try:
+            if self._blocked is None and target in path:
+                self._blocked = "delegation_cycle"
+            self.reserve_step(tokens)
+        except RunGuardrailBlocked as exc:
+            await self._recorder.emit(
+                EventType.GUARDRAIL_BLOCKED, name=target, reason=exc.reason, path=next_path,
+            )
+            raise
+        await self._recorder.emit(EventType.DELEGATION, name=target, path=next_path, usage={"input_tokens": tokens})
+        return next_path
 
     async def emit_start(self) -> None:
         await self._recorder.emit(EventType.AGENT_START, task=self._task.task)

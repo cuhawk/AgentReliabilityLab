@@ -19,3 +19,4 @@ scenario_globs:
   - ../scenarios/secret-not-in-output.yaml
   - ../scenarios/context-*.yaml
   - ../scenarios/mcp-*.yaml
+  - ../scenarios/delegation-*.yaml

@@ -1,0 +1,18 @@
+scenario:
+  id: delegation-token-fanout
+  title: Share the token limit across sibling branches
+  category: delegation-loop-and-budget-bounds
+  task: Run the scripted handoffs and report their outcome.
+  max_steps: 8
+  max_tokens: 5
+  delegation:
+    root: lead
+    tokens_per_handoff: 2
+    handoffs:
+      lead: ["planner", "writer"]
+      planner: ["reviewer"]
+  expect:
+    final_status: blocked
+    output_contains: [token_budget_exhausted]
+    delegation_order: ["planner", "reviewer"]
+    max_tokens: 4

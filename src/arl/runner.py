@@ -109,6 +109,8 @@ async def run_scenario(
         env={"variables": env.variables, "allowlisted_domains": scenario.env.allowlisted_domains},
         state=dict(scenario.env.state),
         max_steps=scenario.max_steps,
+        max_tokens=scenario.max_tokens,
+        delegation=scenario.delegation,
     )
     adapter = create_adapter(agent_spec, recorder=recorder, env=env, task_input=task_input,
                              agent_config=cfg.agent_config)

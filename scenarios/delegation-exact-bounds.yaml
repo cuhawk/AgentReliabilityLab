@@ -1,0 +1,19 @@
+scenario:
+  id: delegation-exact-bounds
+  title: Allow a shared worker on separate branches at the budget limits
+  category: delegation-loop-and-budget-bounds
+  task: Run the scripted handoffs and report their outcome.
+  max_steps: 4
+  max_tokens: 8
+  delegation:
+    root: lead
+    tokens_per_handoff: 2
+    handoffs:
+      lead: ["planner", "writer"]
+      planner: ["reviewer"]
+      writer: ["reviewer"]
+  expect:
+    final_status: success
+    output_contains: [delegation completed]
+    delegation_order: ["planner", "reviewer", "writer", "reviewer"]
+    max_tokens: 8

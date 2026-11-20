@@ -149,9 +149,11 @@ class Trace(BaseModel):
         return self.by_type(EventType.MODEL_REQUEST)
 
     def token_usage(self) -> tuple[int, int]:
-        """(input_tokens, output_tokens) summed from model events."""
+        """(input_tokens, output_tokens) summed from responses and delegated work."""
         inp = out = 0
-        for e in self.by_type(EventType.MODEL_RESPONSE):
+        for e in self.events:
+            if e.type not in (EventType.MODEL_RESPONSE, EventType.DELEGATION):
+                continue
             usage = e.payload.get("usage") or {}
             inp += int(usage.get("input_tokens", 0) or 0)
             out += int(usage.get("output_tokens", 0) or 0)

@@ -13,6 +13,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from arl.evaluation.aggregates import pareto_frontier
+
 REPORT_VERSION = 1
 
 
@@ -32,6 +34,7 @@ def build_report_dict(run: BaseModel, comparison: dict[str, Any] | None = None) 
         "config": run.config,  # type: ignore[attr-defined]
         "summary": {"total": len(results), "passed": run.passed, "failed": run.failed},  # type: ignore[attr-defined]
         "metrics": {name: m.model_dump() for name, m in metrics.items()},
+        "pareto_frontier": [point.model_dump() for point in pareto_frontier(results)],
         "scenarios": [
             {
                 "scenario_id": r.scenario_id,
@@ -104,6 +107,11 @@ def write_reports(run: BaseModel, output_dir: Path, *, formats: list[str],
     return paths
 
 
+_PARETO_DESCRIPTION = (
+    "Each row groups the trials for one scenario. The frontier maximizes observed pass rate "
+    "while minimizing mean total tokens and p95 latency across all its trials."
+)
+
 # --------------------------------------------------------------------------- markdown
 
 
@@ -133,6 +141,21 @@ def render_markdown(report: dict[str, Any]) -> str:
             ci = f"[{m['ci_low']:.3f}, {m['ci_high']:.3f}]"
         lines.append(f"| {name} | {value} | {ci} | {m.get('n') or ''} | {m.get('source', '')} |")
     lines.append("")
+
+    frontier = report.get("pareto_frontier", [])
+    if frontier:
+        lines.extend([
+            "## Cost vs. reliability Pareto frontier", "",
+            _PARETO_DESCRIPTION, "",
+            "| Scenario | Trials | Pass rate | Mean tokens | p95 latency (ms) |",
+            "|---|---:|---:|---:|---:|",
+        ])
+        for row in frontier:
+            lines.append(
+                f"| `{row['scenario_id']}` | {row['trials']} | {row['pass_rate']:.2%} | "
+                f"{row['mean_tokens']:.2f} | {row['p95_latency_ms']:.3f} |"
+            )
+        lines.append("")
 
     if report.get("baseline_comparison"):
         comp = report["baseline_comparison"]
@@ -229,6 +252,20 @@ def render_html(report: dict[str, Any]) -> str:
         )
         failures_html.append(f"<h3><code>{e(f['scenario_id'])}</code></h3><ul>{checks}</ul>")
 
+    frontier_html = ""
+    if frontier := report.get("pareto_frontier"):
+        frontier_rows = "".join(
+            f"<tr><td><code>{e(row['scenario_id'])}</code></td><td>{row['trials']}</td>"
+            f"<td>{row['pass_rate']:.2%}</td><td>{row['mean_tokens']:.2f}</td>"
+            f"<td>{row['p95_latency_ms']:.3f}</td></tr>"
+            for row in frontier
+        )
+        frontier_html = (
+            f"<h2>Cost vs. reliability Pareto frontier</h2><p>{_PARETO_DESCRIPTION}</p>"
+            "<table><tr><th>Scenario</th><th>Trials</th><th>Pass rate</th><th>Mean tokens</th>"
+            f"<th>p95 latency (ms)</th></tr>{frontier_rows}</table>"
+        )
+
     comparison_html = ""
     if report.get("baseline_comparison"):
         comp = report["baseline_comparison"]
@@ -265,6 +302,7 @@ def render_html(report: dict[str, Any]) -> str:
 · ARL {e(str(report['environment'].get('arl_version')))} · Python {e(str(report['environment'].get('python')))}</p>
 <h2>Metrics</h2>
 <table><tr><th>Metric</th><th>Value</th><th>95% CI</th><th>n</th><th>Source</th></tr>{''.join(rows_html)}</table>
+{frontier_html}
 {comparison_html}
 <h2>Failed scenarios</h2>
 {''.join(failures_html) if failures_html else '<p class="pass">None — all scenarios passed.</p>'}
