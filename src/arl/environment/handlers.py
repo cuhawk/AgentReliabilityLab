@@ -58,6 +58,8 @@ def _is_allowlisted(host: str | None, allowlist: list[str]) -> bool:
 
 
 async def run_data(spec: ToolSpec, args: dict[str, Any], ctx: HandlerContext) -> Any:
+    if spec.mcp_output_schema is not None:
+        return spec.params.get("mcp_response")
     key_field = str(spec.params.get("key", "id"))
     records: list[dict[str, Any]] = spec.params.get("records", [])
     wanted = args.get(key_field)

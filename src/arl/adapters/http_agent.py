@@ -96,8 +96,15 @@ class HttpAgent(AgentAdapter):
             "tools": [m.model_dump() for m in self._task.tools],
             "history": history,
         }
+        if self._task.prior_turns:
+            payload["prior_turns"] = self._task.prior_turns
         await self._recorder.emit_model_request(step=len(history), input_tokens=len(json.dumps(payload)) // 4)
-        response = await self._client.post("/turn", json=payload)
+        if self.scheduler is None:
+            response = await self._client.post("/turn", json=payload)
+        else:
+            response = await self.scheduler.request(
+                lambda: self._client.post("/turn", json=payload), key=f"{self.request_key}:{len(history)}",
+            )
         response.raise_for_status()
         return response.json()
 
@@ -125,6 +132,9 @@ class HttpAgent(AgentAdapter):
 
     async def receive_event(self, event: dict[str, Any]) -> None:
         self._state.memory.setdefault("platform_events", []).append(event)
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
 
     async def cancel(self) -> None:
         self._cancelled = True

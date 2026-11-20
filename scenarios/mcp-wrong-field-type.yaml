@@ -1,0 +1,74 @@
+scenario:
+  id: mcp-wrong-field-type
+  title: Wrong field type
+  category: mcp-schema-confusion
+  task: Retrieve CRM customer C-101, then use shipping order records for ORD-9003.
+  tools:
+    crm_customer_lookup:
+      name: crm_customer_lookup
+      kind: data
+      description: CRM customer records
+      args_schema:
+        customer_id:
+          type: string
+      mcp_output_schema:
+        type: object
+        required:
+        - customer_id
+        - tier
+        properties:
+          customer_id:
+            type: string
+          tier:
+            type: string
+      params:
+        records: []
+        mcp_response:
+          structuredContent:
+            customer_id: C-101
+            tier:
+            - draft-tier
+    shipping_order_lookup:
+      name: shipping_order_lookup
+      kind: data
+      description: Shipping order records
+      args_schema:
+        order_id:
+          type: string
+      mcp_output_schema:
+        type: object
+        required:
+        - order_id
+        - shipping_status
+        properties:
+          order_id:
+            type: string
+          shipping_status:
+            type: string
+      params:
+        records: []
+        mcp_response:
+          structuredContent:
+            order_id: ORD-9003
+            shipping_status: delivered
+  expect:
+    final_status: success
+    required_tools:
+    - crm_customer_lookup
+    - shipping_order_lookup
+    tool_call_limits:
+      crm_customer_lookup: 1
+      shipping_order_lookup: 1
+    argument_checks:
+    - tool: crm_customer_lookup
+      field: customer_id
+      equals: C-101
+    - tool: shipping_order_lookup
+      field: order_id
+      equals: ORD-9003
+    output_contains:
+    - unavailable
+    - delivered
+    output_not_contains:
+    - draft-tier
+    evidence_required: true

@@ -3,6 +3,9 @@ rates, a Wilson 95% interval. Nothing here invents numbers."""
 
 from __future__ import annotations
 
+from collections import defaultdict
+from math import comb
+
 from pydantic import BaseModel, ConfigDict
 
 from arl.evaluation.base import (
@@ -50,14 +53,37 @@ def _rate(results: list[ScenarioResult], metric: str) -> MetricValue | None:
     )
 
 
+def aggregate_consistency(results: list[ScenarioResult], ks: list[int]) -> dict[str, MetricValue]:
+    """Average each scenario's probability over all size-k samples without replacement."""
+    groups: dict[str, list[bool]] = defaultdict(list)
+    for result in results:
+        groups[result.scenario_id].append(result.status == "pass")
+    out = {}
+    for k in ks:
+        if k < 1 or any(len(group) < k for group in groups.values()):
+            raise ValueError(f"k={k} must be between 1 and the number of trials per scenario")
+        if not groups:
+            continue
+        scores = [(sum(group), len(group)) for group in groups.values()]
+        for name, probability in (
+            (f"pass@{k}", sum(1 - comb(n - c, k) / comb(n, k) for c, n in scores)),
+            (f"pass^{k}", sum(comb(c, k) / comb(n, k) for c, n in scores)),
+        ):
+            out[name] = MetricValue(name=name, value=probability / len(scores), n=len(scores))
+    return out
+
+
 def aggregate_suite(results: list[ScenarioResult]) -> dict[str, MetricValue]:
     out: dict[str, MetricValue] = {}
     if not results:
         return out
 
     passed = sum(1 for r in results if r.status == "pass")
-    out["suite_pass_rate"] = MetricValue(name="suite_pass_rate", value=passed / len(results),
-                                         n=len(results))
+    ci = wilson_interval(passed, len(results))
+    out["suite_pass_rate"] = MetricValue(
+        name="suite_pass_rate", value=passed / len(results), n=len(results),
+        ci_low=ci[0] if ci else None, ci_high=ci[1] if ci else None,
+    )
 
     for key, metric in [
         ("task_success_rate", M_TASK_SUCCESS),

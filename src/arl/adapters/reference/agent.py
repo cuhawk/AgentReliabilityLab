@@ -15,7 +15,7 @@ import re
 from typing import Any
 
 from arl.adapters.base import AgentAdapter, AgentState, AgentStatus, ModelCallError
-from arl.adapters.reference.intents import PlanStep, build_plan, pick_tool_for_step
+from arl.adapters.reference.intents import PlanStep, build_plan, entities_of, pick_tool_for_step
 from arl.adapters.reference.profiles import ReferenceAgentConfig
 from arl.environment.env import ToolEnvironment, ToolManifest
 from arl.environment.errors import (
@@ -24,6 +24,7 @@ from arl.environment.errors import (
     StateUnavailableError,
     ToolError,
 )
+from arl.evaluation.evaluators.completion import validate_against_schema
 from arl.recording.recorder import TraceRecorder
 
 _EXFIL_URL_RE = re.compile(r"https?://[^\s\"']+")
@@ -65,7 +66,15 @@ class ReferenceAgent(AgentAdapter):
     ) -> None:
         super().__init__(agent_id, recorder, env, task_input)
         self.config = config
-        self._plan: list[PlanStep] = build_plan(task_input.task, list(task_input.tools))
+        task = task_input.task
+        if "that " in task.lower() and not entities_of(task):
+            for turn in reversed(task_input.prior_turns):
+                entities = set(entities_of(turn))
+                if entities:
+                    if len(entities) == 1:
+                        task = f"{task} {entities.pop()}"
+                    break
+        self._plan: list[PlanStep] = build_plan(task, list(task_input.tools))
         self._findings: list[dict[str, Any]] = []
         self._unavailable: list[str] = []
         self._served_docs: list[dict[str, Any]] = []
@@ -178,6 +187,22 @@ class ReferenceAgent(AgentAdapter):
             key_field = self._key_field_of(tool)
             args: dict[str, Any] = {key_field: entity} if entity else {key_field: step.query}
             outcome = await self._exec_tool(tool, args, purpose=f"look up {entity or 'record'}")
+            if outcome.ok and tool.mcp_output_schema is not None:
+                result = outcome.result
+                structured = result.get("structuredContent") if isinstance(result, dict) else None
+                if (
+                    isinstance(result, dict)
+                    and result.get("isError", False) is False
+                    and isinstance(structured, dict)
+                    and not validate_against_schema(structured, tool.mcp_output_schema)
+                    and structured.get(key_field) == args[key_field]
+                ):
+                    properties = tool.mcp_output_schema.get("properties", {})
+                    record = {key: structured[key] for key in properties if key in structured}
+                    self._findings.append({"source": tool.name, "entity": entity, "record": record})
+                else:
+                    self._unavailable.append(entity)
+                return
             if outcome.ok and isinstance(outcome.result, dict):
                 if outcome.result.get("found"):
                     self._findings.append({"source": tool.name, "entity": entity, "record": outcome.result["record"]})

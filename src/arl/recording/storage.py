@@ -178,7 +178,7 @@ class SqliteStorage(Storage):
             self._conn.execute(
                 "INSERT OR REPLACE INTO scenario_results VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
-                    run_id, result.scenario_id, result.title, result.category, result.status,
+                    run_id, result.result_id, result.title, result.category, result.status,
                     result.trace_status, result.final_status, result.duration_ms,
                     _dump(result.metrics), _dump([c.model_dump() for c in result.checks]),
                     _dump([v.model_dump() for v in result.violations]), _dump(result.faults),

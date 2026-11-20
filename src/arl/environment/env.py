@@ -51,6 +51,7 @@ class ToolManifest(BaseModel):
     risk_class: RiskClass = RiskClass.READ
     args_schema: dict[str, Any] = Field(default_factory=dict)
     scope: dict[str, Any] | None = None
+    mcp_output_schema: dict[str, Any] | None = None
 
 
 class EffectRecord(BaseModel):
@@ -137,6 +138,7 @@ class ToolEnvironment:
                 risk_class=spec.risk_class,
                 args_schema={k: v.model_dump() for k, v in spec.args_schema.items()},
                 scope=spec.scope.model_dump() if spec.scope else None,
+                mcp_output_schema=spec.mcp_output_schema,
             )
             for spec in self.scenario.tools.values()
         ]

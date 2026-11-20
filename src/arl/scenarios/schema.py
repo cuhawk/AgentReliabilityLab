@@ -177,6 +177,7 @@ class ToolSpec(BaseModel):
     risk_class: RiskClass = RiskClass.READ
     args_schema: dict[str, ArgSpec] = Field(default_factory=dict)
     scope: ScopeSpec | None = None
+    mcp_output_schema: dict[str, Any] | None = None
     params: dict[str, Any] = Field(default_factory=dict)
     faults: list[FaultStep] = Field(default_factory=list)
     # For effect tools: logical destination, checked against env allowlist.
@@ -364,6 +365,8 @@ class ScenarioCategory(StrEnum):
     hallucination = "hallucination"
     cost = "cost"
     latency = "latency"
+    context_poisoning = "context-poisoning"
+    mcp_schema_confusion = "mcp-schema-confusion"
 
 
 _SCENARIO_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-_.]{2,80}$")
@@ -384,6 +387,7 @@ class Scenario(BaseModel):
     category: ScenarioCategory = ScenarioCategory.happy_path
     description: str = ""
     task: str
+    prior_turns: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     tools: dict[str, ToolSpec] = Field(default_factory=dict)
     model_faults: list[FaultStep] = Field(default_factory=list)
