@@ -52,5 +52,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t arl .
-      - run: docker run --rm arl --version
+      - run: docker run --rm arl version
       - run: docker run --rm arl eval suites/ci.yaml --trials 2 --concurrency 4
